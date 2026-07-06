@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OG&apos;s Golf</title>
+  <link rel="stylesheet" href="src/styles/main.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Twelve Stones Golf Club</p>
+      <h1>OG&apos;s Golf</h1>
+    </div>
+    <button id="resetScores" type="button" class="reset-button">Reset</button>
+  </header>
+
+  <main>
+    <div class="top-actions">
+      <button id="showPreviousRounds" type="button" class="secondary-button">Previous Rounds</button>
+    </div>
+
+    <section id="resumeScreen" class="resume-section is-hidden" aria-labelledby="resumeTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">Saved Round</p>
+          <h2 id="resumeTitle">Resume Round?</h2>
+        </div>
+      </div>
+
+      <div class="setup-panel">
+        <strong id="resumeCourseName">Twelve Stones Golf Club</strong>
+        <span id="resumeHoleStatus" class="player-details">Current Hole: 1 of 18</span>
+      </div>
+
+      <div class="resume-actions">
+        <button id="resumeRound" type="button" class="save-button">Resume</button>
+        <button id="startFreshRound" type="button" class="secondary-button">Start New Round</button>
+        <button id="discardSavedRound" type="button" class="secondary-button">Discard Saved Round</button>
+      </div>
+    </section>
+
+    <section id="setupScreen" class="setup-section" aria-labelledby="setupTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">Round Setup</p>
+          <h2 id="setupTitle">Start a Round</h2>
+        </div>
+      </div>
+
+      <div class="setup-panel">
+        <label class="field-label" for="courseSelect">Course</label>
+        <select id="courseSelect" class="field-control"></select>
+      </div>
+
+      <div class="setup-panel">
+        <h3>Players</h3>
+        <div id="memberList" class="member-list"></div>
+      </div>
+
+      <div class="setup-panel">
+        <h3>Games</h3>
+        <div id="gameList" class="game-list"></div>
+      </div>
+
+      <button id="startRound" type="button" class="save-button start-button">Start Round</button>
+    </section>
+
+    <div id="roundScreen" class="round-screen is-hidden">
+      <section class="round-settings-section" aria-labelledby="roundSettingsTitle">
+        <h2 id="roundSettingsTitle">Round Settings</h2>
+        <div id="roundSettingsSummary" class="round-settings-summary"></div>
+      </section>
+
+      <section class="hole-section" aria-labelledby="holeTitle">
+      <div class="round-status-bar">
+        <span id="saveStatusMessage" class="save-status-message"></span>
+        <span id="currentHoleStatus" class="current-hole-status">Current Hole: 1 of 18</span>
+      </div>
+
+      <div class="hole-summary">
+        <div>
+          <p class="eyebrow dark">Current Hole</p>
+          <h2 id="holeTitle">Hole 1</h2>
+        </div>
+        <div id="holeDetails" class="hole-details"></div>
+      </div>
+
+      <div id="holePlayers" class="hole-players"></div>
+
+      <div class="action-row">
+        <button id="previousHole" type="button" class="secondary-button">Previous Hole</button>
+        <button id="saveHole" type="button" class="save-button">Save &amp; Next &rarr;</button>
+        <button id="nextHole" type="button" class="secondary-button">Next Hole</button>
+        <button id="undoLastHole" type="button" class="secondary-button">Undo Last Hole</button>
+      </div>
+      </section>
+
+      <section class="leaderboard-section" aria-labelledby="leaderboardTitle">
+      <h2 id="leaderboardTitle">Leaderboard</h2>
+      <div id="leaderboard" class="leaderboard"></div>
+      </section>
+
+      <section class="points-payout-section" aria-labelledby="pointsPayoutTitle">
+      <h2 id="pointsPayoutTitle">Points Payout</h2>
+      <div id="pointsPayout" class="points-payout"></div>
+      </section>
+
+      <section class="skins-section" aria-labelledby="skinsTitle">
+      <h2 id="skinsTitle">Net Skins</h2>
+      <div id="skinsSummary" class="skins-summary"></div>
+      </section>
+    </div>
+
+    <section id="summaryScreen" class="summary-section is-hidden" aria-labelledby="summaryTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">End of Round</p>
+          <h2 id="summaryTitle">Final Summary</h2>
+        </div>
+      </div>
+
+      <div id="finalSummary" class="final-summary"></div>
+
+      <div class="summary-actions">
+        <button id="reviewScorecard" type="button" class="secondary-button">Review Scorecard</button>
+        <button id="summaryUndoLastHole" type="button" class="secondary-button">Undo Last Hole</button>
+        <button id="saveRound" type="button" class="save-button">Save Round</button>
+        <button id="startNewRound" type="button" class="secondary-button">Start New Round</button>
+      </div>
+    </section>
+
+    <section id="previousRoundsScreen" class="previous-rounds-section is-hidden" aria-labelledby="previousRoundsTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">History</p>
+          <h2 id="previousRoundsTitle">Previous Rounds</h2>
+        </div>
+      </div>
+
+      <div id="previousRoundsList" class="previous-rounds-list"></div>
+
+      <button id="backFromPreviousRounds" type="button" class="secondary-button">Back</button>
+    </section>
+  </main>
+
+  <script src="src/data/course.js"></script>
+  <script src="src/data/players.js"></script>
+  <script src="src/rules/points.js"></script>
+  <script src="src/rules/handicap.js"></script>
+  <script src="src/rules/skins.js"></script>
+  <script src="src/state/roundState.js"></script>
+  <script src="src/state/roundStorage.js"></script>
+  <script src="src/ui/dom.js"></script>
+  <script src="src/ui/formatters.js"></script>
+  <script src="src/ui/setupView.js"></script>
+  <script src="src/ui/holeView.js"></script>
+  <script src="src/ui/leaderboardView.js"></script>
+  <script src="src/ui/pointsPayoutView.js"></script>
+  <script src="src/ui/skinsView.js"></script>
+  <script src="src/ui/finalSummaryView.js"></script>
+  <script src="src/ui/previousRoundsView.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

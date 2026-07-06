@@ -1,0 +1,9 @@
+.git/
+work/
+outputs/
+.agents/
+.codex/
+
+# Local OS/editor files
+Thumbs.db
+.DS_Store

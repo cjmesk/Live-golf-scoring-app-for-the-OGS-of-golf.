@@ -1,0 +1,43 @@
+window.OGSGolf = window.OGSGolf || {};
+window.OGSGolf.ui = window.OGSGolf.ui || {};
+
+window.OGSGolf.ui.getElements = function getElements() {
+  return {
+    setupScreen: document.querySelector("#setupScreen"),
+    resumeScreen: document.querySelector("#resumeScreen"),
+    resumeCourseName: document.querySelector("#resumeCourseName"),
+    resumeHoleStatus: document.querySelector("#resumeHoleStatus"),
+    resumeRound: document.querySelector("#resumeRound"),
+    startFreshRound: document.querySelector("#startFreshRound"),
+    discardSavedRound: document.querySelector("#discardSavedRound"),
+    roundScreen: document.querySelector("#roundScreen"),
+    previousRoundsScreen: document.querySelector("#previousRoundsScreen"),
+    previousRoundsList: document.querySelector("#previousRoundsList"),
+    showPreviousRounds: document.querySelector("#showPreviousRounds"),
+    backFromPreviousRounds: document.querySelector("#backFromPreviousRounds"),
+    courseSelect: document.querySelector("#courseSelect"),
+    memberList: document.querySelector("#memberList"),
+    gameList: document.querySelector("#gameList"),
+    startRound: document.querySelector("#startRound"),
+    summaryScreen: document.querySelector("#summaryScreen"),
+    finalSummary: document.querySelector("#finalSummary"),
+    reviewScorecard: document.querySelector("#reviewScorecard"),
+    saveRound: document.querySelector("#saveRound"),
+    startNewRound: document.querySelector("#startNewRound"),
+    roundSettingsSummary: document.querySelector("#roundSettingsSummary"),
+    saveStatusMessage: document.querySelector("#saveStatusMessage"),
+    currentHoleStatus: document.querySelector("#currentHoleStatus"),
+    holeTitle: document.querySelector("#holeTitle"),
+    holeDetails: document.querySelector("#holeDetails"),
+    holePlayers: document.querySelector("#holePlayers"),
+    leaderboard: document.querySelector("#leaderboard"),
+    pointsPayout: document.querySelector("#pointsPayout"),
+    skinsSummary: document.querySelector("#skinsSummary"),
+    previousHole: document.querySelector("#previousHole"),
+    nextHole: document.querySelector("#nextHole"),
+    undoLastHole: document.querySelector("#undoLastHole"),
+    summaryUndoLastHole: document.querySelector("#summaryUndoLastHole"),
+    saveHole: document.querySelector("#saveHole"),
+    resetScores: document.querySelector("#resetScores")
+  };
+};
