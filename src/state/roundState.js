@@ -335,10 +335,14 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     draftScores[playerId] = Math.max(1, Math.min(12, nextScore));
   }
 
-  function saveCurrentHole() {
-    const holeResults = [];
+  function saveCurrentHole(playersToSave = players) {
+    const existingHoleResults = savedHoleResults[currentHoleIndex] || [];
+    const playerIdsToSave = new Set(playersToSave.map((player) => player.id));
+    const holeResults = existingHoleResults.filter(
+      (result) => !playerIdsToSave.has(result.playerId)
+    );
 
-    players.forEach((player) => {
+    playersToSave.forEach((player) => {
       const grossScore = draftScores[player.id];
       const strokesReceived = getStrokesForPlayerOnHole(player);
       const netScore = getNetScore(grossScore, strokesReceived);

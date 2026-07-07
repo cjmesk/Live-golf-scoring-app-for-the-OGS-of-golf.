@@ -13,14 +13,32 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
     .map((course) => `<option value="${course.id}">${course.name}</option>`)
     .join("");
 
+  const selectedMemberIds = new Set(members.filter((member) => member.active).map((member) => member.id));
+  const teeOverrides = new Map();
+  elements.memberList.selectedMemberIds = selectedMemberIds;
+  elements.memberList.teeOverrides = teeOverrides;
+
+  function updateSelectedCount() {
+    elements.selectedPlayerCount.textContent = `${selectedMemberIds.size} selected`;
+  }
+
+  function renderMemberRows() {
+    const searchText = elements.memberSearch.value.trim().toLowerCase();
+    const visibleMembers = members.filter((member) => {
+      if (!member.active) return false;
+      if (!searchText) return true;
+
+      return `${member.name} ${member.ghin || ""}`.toLowerCase().includes(searchText);
+    });
+
   elements.memberList.innerHTML = "";
 
-  members.forEach((member) => {
+  visibleMembers.forEach((member) => {
     const row = document.createElement("div");
     row.className = "member-row";
     row.innerHTML = `
       <label class="member-check">
-        <input type="checkbox" data-member-id="${member.id}" checked>
+        <input type="checkbox" data-member-id="${member.id}"${selectedMemberIds.has(member.id) ? " checked" : ""}>
         <span>
           <strong>${member.name}</strong>
           <span>${member.ghin ? `GHIN ${member.ghin}` : "No GHIN"} | Index ${member.handicap}</span>
@@ -29,13 +47,35 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
       <label class="tee-select-label">
         <span>Tees</span>
         <select class="field-control" data-tee-for="${member.id}">
-          <option value="white"${member.tee === "white" ? " selected" : ""}>White</option>
-          <option value="silver"${member.tee === "silver" ? " selected" : ""}>Silver</option>
+          <option value="white"${(teeOverrides.get(member.id) || member.tee) === "white" ? " selected" : ""}>White</option>
+          <option value="silver"${(teeOverrides.get(member.id) || member.tee) === "silver" ? " selected" : ""}>Silver</option>
         </select>
       </label>
     `;
     elements.memberList.appendChild(row);
   });
+  }
+
+  renderMemberRows();
+  updateSelectedCount();
+
+  elements.memberSearch.oninput = renderMemberRows;
+  elements.memberList.onchange = (event) => {
+    const checkbox = event.target.closest("[data-member-id]");
+    const teeSelect = event.target.closest("[data-tee-for]");
+
+    if (checkbox?.checked) {
+      selectedMemberIds.add(checkbox.dataset.memberId);
+    } else if (checkbox) {
+      selectedMemberIds.delete(checkbox.dataset.memberId);
+    }
+
+    if (teeSelect) {
+      teeOverrides.set(teeSelect.dataset.teeFor, teeSelect.value);
+    }
+
+    updateSelectedCount();
+  };
 
   elements.gameList.innerHTML = "";
 
@@ -58,16 +98,14 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
 
 window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, courses, members) {
   const course = courses.find((item) => item.id === elements.courseSelect.value) || courses[0];
+  const selectedMemberIds = elements.memberList.selectedMemberIds || new Set();
+  const teeOverrides = elements.memberList.teeOverrides || new Map();
   const selectedPlayers = members
-    .filter((member) => {
-      const checkbox = elements.memberList.querySelector(`[data-member-id="${member.id}"]`);
-      return checkbox?.checked;
-    })
+    .filter((member) => selectedMemberIds.has(member.id))
     .map((member) => {
-      const teeSelect = elements.memberList.querySelector(`[data-tee-for="${member.id}"]`);
       return {
         ...member,
-        tee: teeSelect?.value || member.tee
+        tee: teeOverrides.get(member.id) || member.tee
       };
     });
 
@@ -86,6 +124,12 @@ window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, cours
   return {
     course,
     players: selectedPlayers,
+    groups: selectedPlayers.reduce((groups, player, index) => {
+      const groupIndex = Math.floor(index / 4);
+      groups[groupIndex] = groups[groupIndex] || [];
+      groups[groupIndex].push(player.id);
+      return groups;
+    }, []),
     games
   };
 };
@@ -100,7 +144,7 @@ window.OGSGolf.ui.renderRoundSettingsSummary = function renderRoundSettingsSumma
     <div class="settings-card">
       <div>
         <strong>${roundSettings.course.name}</strong>
-        <span>${roundSettings.players.length} players</span>
+        <span>${roundSettings.players.length} players | ${roundSettings.groups.length} group${roundSettings.groups.length === 1 ? "" : "s"}</span>
       </div>
       <div>${gamesText}</div>
     </div>

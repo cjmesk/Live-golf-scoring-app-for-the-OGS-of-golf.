@@ -1,5 +1,6 @@
 const { courses, players: members } = window.OGSGolf.data;
 const { createRoundState, roundStorage } = window.OGSGolf.state;
+const { roundCloudService } = window.OGSGolf.cloud;
 const {
   getElements,
   readSetupSettings,
@@ -20,6 +21,7 @@ let roundSettings = null;
 let roundState = null;
 let statusTimer = null;
 let completedRoundSaved = false;
+let currentGroupIndex = 0;
 
 function setActiveScreen(screenName) {
   elements.resumeScreen.classList.toggle("is-hidden", screenName !== "resume");
@@ -41,8 +43,13 @@ function renderHoleStatus() {
 }
 
 function renderCurrentHole() {
-  renderHoleView(elements, selectedCourse, selectedPlayers, roundState);
+  renderHoleView(elements, selectedCourse, getCurrentGroupPlayers(), roundState);
   renderHoleStatus();
+}
+
+function getCurrentGroupPlayers() {
+  const groupIds = roundSettings?.groups?.[currentGroupIndex] || selectedPlayers.slice(0, 4).map((player) => player.id);
+  return selectedPlayers.filter((player) => groupIds.includes(player.id));
 }
 
 function renderApp() {
@@ -105,6 +112,7 @@ function startFreshRound() {
   roundState = null;
   selectedCourse = courses[0];
   selectedPlayers = [];
+  currentGroupIndex = 0;
   completedRoundSaved = false;
   elements.saveStatusMessage.textContent = "";
   setActiveScreen("setup");
@@ -123,6 +131,17 @@ function discardSavedRound() {
 
 function saveRound() {
   saveCompletedRound();
+}
+
+async function saveRoundToCloud() {
+  if (!roundState || !roundState.isRoundComplete()) {
+    elements.cloudSaveStatus.textContent = "Finish the round before saving to cloud.";
+    return;
+  }
+
+  elements.cloudSaveStatus.textContent = "Saving to cloud...";
+  const result = await roundCloudService.saveCompletedRound(roundState.getRoundExport());
+  elements.cloudSaveStatus.textContent = result.message;
 }
 
 function showPreviousRounds() {
@@ -179,6 +198,7 @@ function startRound() {
   selectedCourse = roundSettings.course;
   selectedPlayers = roundSettings.players;
   roundState = createRoundState(selectedCourse, selectedPlayers, roundSettings);
+  currentGroupIndex = 0;
   completedRoundSaved = false;
   roundStorage.clearUnfinished();
 
@@ -212,6 +232,7 @@ function resumeSavedRound() {
     players: selectedPlayers
   };
   roundState = createRoundState(selectedCourse, selectedPlayers, roundSettings, savedRound);
+  currentGroupIndex = 0;
   completedRoundSaved = false;
 
   setActiveScreen("round");
@@ -265,7 +286,7 @@ elements.saveHole.addEventListener("click", () => {
 
   const savedHoleIndex = roundState.currentHoleIndex;
   const isLastHole = savedHoleIndex === roundState.totalHoles - 1;
-  roundState.saveCurrentHole();
+  roundState.saveCurrentHole(getCurrentGroupPlayers());
 
   if (isLastHole && roundState.isRoundComplete()) {
     showFinalSummary();
@@ -292,5 +313,6 @@ elements.undoLastHole.addEventListener("click", undoLastHole);
 elements.summaryUndoLastHole.addEventListener("click", undoLastHole);
 elements.startNewRound.addEventListener("click", startNewRound);
 elements.saveRound.addEventListener("click", saveRound);
+elements.saveRoundCloud.addEventListener("click", saveRoundToCloud);
 elements.showPreviousRounds.addEventListener("click", showPreviousRounds);
 elements.backFromPreviousRounds.addEventListener("click", returnFromPreviousRounds);

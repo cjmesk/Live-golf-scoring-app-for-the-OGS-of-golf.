@@ -17,6 +17,11 @@ src/
     skins.js
   state/
     roundState.js
+    roundStorage.js
+  cloud/
+    supabaseConfig.js
+    supabaseClient.js
+    roundCloudService.js
   ui/
     dom.js
     formatters.js
@@ -42,6 +47,8 @@ docs/
 
 `src/data/players.js` stores player facts: names, GHIN numbers, handicaps, tee choices, and active status.
 
+The master member roster is designed to grow up to 50 active/inactive players. Round setup selects only the players who are playing today.
+
 `src/rules/points.js` stores the points system. League scoring rules belong here so they can be changed without touching the screen layout.
 
 `src/rules/handicap.js` stores Course Handicap, stroke allocation, and net score logic.
@@ -50,11 +57,21 @@ docs/
 
 `src/state/roundState.js` stores the current round in progress: current hole, saved scores, draft scores, and score totals.
 
+`src/state/roundStorage.js` keeps localStorage saves. It remains the primary backup even after cloud backup is added.
+
+`src/cloud/supabaseConfig.js` stores the Supabase project URL and anon key.
+
+`src/cloud/supabaseClient.js` creates the Supabase browser client when Supabase is configured and online.
+
+`src/cloud/roundCloudService.js` saves completed rounds to Supabase. It does not do live scoring yet.
+
 `src/ui/dom.js` finds the page elements that JavaScript needs.
 
 `src/ui/formatters.js` holds small display helpers, such as how player details should be shown.
 
 `src/ui/setupView.js` renders the commissioner setup screen and reads the selected course, players, tee overrides, enabled games, and dollar amounts.
+
+Selected round players are grouped in foursomes. The current scoring screen renders one group at a time so a large roster never loads into the scoring view all at once.
 
 `src/ui/holeView.js` renders the one-hole score entry screen.
 

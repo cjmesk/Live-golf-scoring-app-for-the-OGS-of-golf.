@@ -1,6 +1,8 @@
 window.OGSGolf = window.OGSGolf || {};
 window.OGSGolf.data = window.OGSGolf.data || {};
 
+window.OGSGolf.data.maxRosterSize = 50;
+
 window.OGSGolf.data.players = [
   {
     id: "chris",

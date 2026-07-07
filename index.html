@@ -55,6 +55,10 @@
 
       <div class="setup-panel">
         <h3>Players</h3>
+        <div class="setup-tools">
+          <input id="memberSearch" class="field-control" type="search" placeholder="Search roster">
+          <span id="selectedPlayerCount" class="player-details">0 selected</span>
+        </div>
         <div id="memberList" class="member-list"></div>
       </div>
 
@@ -126,8 +130,10 @@
         <button id="reviewScorecard" type="button" class="secondary-button">Review Scorecard</button>
         <button id="summaryUndoLastHole" type="button" class="secondary-button">Undo Last Hole</button>
         <button id="saveRound" type="button" class="save-button">Save Round</button>
+        <button id="saveRoundCloud" type="button" class="save-button">Save Completed Round to Cloud</button>
         <button id="startNewRound" type="button" class="secondary-button">Start New Round</button>
       </div>
+      <div id="cloudSaveStatus" class="cloud-save-status"></div>
     </section>
 
     <section id="previousRoundsScreen" class="previous-rounds-section is-hidden" aria-labelledby="previousRoundsTitle">
@@ -151,6 +157,10 @@
   <script src="src/rules/skins.js"></script>
   <script src="src/state/roundState.js"></script>
   <script src="src/state/roundStorage.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="src/cloud/supabaseConfig.js"></script>
+  <script src="src/cloud/supabaseClient.js"></script>
+  <script src="src/cloud/roundCloudService.js"></script>
   <script src="src/ui/dom.js"></script>
   <script src="src/ui/formatters.js"></script>
   <script src="src/ui/setupView.js"></script>
