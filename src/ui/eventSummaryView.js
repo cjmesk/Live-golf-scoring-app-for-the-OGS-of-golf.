@@ -50,6 +50,27 @@ window.OGSGolf.ui.renderEventSummary = function renderEventSummary(elements, rou
     }
   ];
   let estimatedPurse = 0;
+  const teamRows = Object.entries(roundSettings.teamAssignments || {})
+    .reduce((teams, [playerId, teamId]) => {
+      teams[teamId] = teams[teamId] || [];
+      const playerName = roundSettings.players.find((player) => player.id === playerId)?.name;
+
+      if (playerName) {
+        teams[teamId].push(playerName);
+      }
+
+      return teams;
+    }, {});
+  const teamAssignmentRows = Object.entries(teamRows)
+    .sort(([firstTeam], [secondTeam]) => firstTeam.localeCompare(secondTeam))
+    .map(([teamId, playerNames]) => `
+      <div class="summary-row">
+        <span>${teamId.replace("team-", "Team ")}</span>
+        <strong>${playerNames.length} players</strong>
+        <small>${playerNames.join(", ")}</small>
+      </div>
+    `)
+    .join("");
   const activeGameRows = gameRows
     .filter((game) => roundSettings.games[game.key]?.enabled)
     .map((game) => {
@@ -104,5 +125,14 @@ window.OGSGolf.ui.renderEventSummary = function renderEventSummary(elements, rou
         ${activeGameRows || `<p class="empty-state">No games enabled.</p>`}
       </div>
     </section>
+
+    ${roundSettings.games.teamChallenge?.enabled ? `
+      <section class="summary-block">
+        <h3>Team Challenge Teams</h3>
+        <div class="summary-list">
+          ${teamAssignmentRows || `<p class="empty-state">No teams assigned yet.</p>`}
+        </div>
+      </section>
+    ` : ""}
   `;
 };

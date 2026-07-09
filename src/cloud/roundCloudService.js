@@ -61,6 +61,24 @@ window.OGSGolf.cloud.roundCloudService = {
     }
   },
 
+  async clearActiveRound() {
+    const client = window.OGSGolf.cloud.getSupabaseClient();
+
+    if (!client) {
+      return { ok: false };
+    }
+
+    try {
+      await client.from("rounds").update({
+        completed: true
+      }).eq("completed", false).throwOnError();
+
+      return { ok: true };
+    } catch (error) {
+      return { ok: false };
+    }
+  },
+
   async savePlayers(players) {
     const client = window.OGSGolf.cloud.getSupabaseClient();
 

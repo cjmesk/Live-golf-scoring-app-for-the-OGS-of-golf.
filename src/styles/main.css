@@ -36,7 +36,7 @@ button:disabled {
 }
 
 .is-hidden {
-  display: none;
+  display: none !important;
 }
 
 .app-header {
@@ -47,6 +47,63 @@ button:disabled {
   padding: 18px 16px;
   color: white;
   background: var(--green-dark);
+}
+
+.menu-toggle {
+  width: 48px;
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 8px;
+  color: white;
+  background: transparent;
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+
+.app-menu {
+  display: grid;
+  gap: 8px;
+  width: min(780px, 100%);
+  margin: 0 auto;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #eef5ef;
+}
+
+.app-menu button,
+.menu-mode-button {
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--green-dark);
+  background: var(--paper);
+  font-weight: 800;
+  text-align: left;
+  padding: 0 12px;
+}
+
+.menu-pin-label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.menu-mode-button.is-on {
+  border-color: var(--green-dark);
+  color: white;
+  background: var(--green);
+}
+
+.app-footer {
+  width: min(780px, 100%);
+  margin: 0 auto;
+  padding: 18px 14px 24px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 .eyebrow {
@@ -83,6 +140,18 @@ main {
   width: min(780px, 100%);
   margin: 0 auto;
   padding: 14px;
+}
+
+body.is-scoring main {
+  padding-top: 6px;
+}
+
+body.is-scoring .app-header {
+  padding: 10px 12px;
+}
+
+body.is-scoring h1 {
+  font-size: 1.35rem;
 }
 
 .reset-button,
@@ -144,6 +213,22 @@ main {
   margin-bottom: 12px;
 }
 
+body.is-scoring .hole-section {
+  margin-top: 0;
+}
+
+body.is-scoring .round-status-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+body.is-scoring .current-hole-status {
+  color: var(--green-dark);
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
 .setup-header,
 .setup-panel,
 .settings-card {
@@ -191,7 +276,8 @@ main {
 }
 
 .member-row,
-.game-row {
+.game-row,
+.team-assignment-row {
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -254,9 +340,9 @@ main {
 
 .round-status-bar {
   display: grid;
-  gap: 4px;
-  margin-bottom: 12px;
-  padding: 10px 12px;
+  gap: 2px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--paper);
@@ -270,7 +356,7 @@ main {
 
 .current-hole-status {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 700;
 }
 
@@ -278,6 +364,11 @@ main {
 .leaderboard {
   display: grid;
   gap: 10px;
+}
+
+.hole-players {
+  margin-bottom: 12px;
+  scroll-margin-top: 74px;
 }
 
 .hole-player {
@@ -603,6 +694,10 @@ main {
 }
 
 @media (min-width: 640px) {
+  .app-menu {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .hole-summary {
     grid-template-columns: 1fr auto;
     align-items: center;
@@ -626,7 +721,8 @@ main {
   }
 
   .member-row,
-  .game-row {
+  .game-row,
+  .team-assignment-row {
     grid-template-columns: 1fr 150px;
     align-items: center;
   }

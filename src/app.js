@@ -37,6 +37,8 @@ let currentScorerId = scorerStorage.getScorerId();
 let commissionerMode = scorerStorage.isCommissioner();
 
 function setActiveScreen(screenName) {
+  const isScoringScreen = screenName === "round";
+
   elements.resumeScreen.classList.toggle("is-hidden", screenName !== "resume");
   elements.scorerScreen.classList.toggle("is-hidden", screenName !== "scorer");
   elements.setupScreen.classList.toggle("is-hidden", screenName !== "setup");
@@ -46,10 +48,219 @@ function setActiveScreen(screenName) {
   elements.summaryScreen.classList.toggle("is-hidden", screenName !== "summary");
   elements.previousRoundsScreen.classList.toggle("is-hidden", screenName !== "previous");
   elements.playerManagementScreen.classList.toggle("is-hidden", screenName !== "players");
+  elements.courseManagementScreen.classList.toggle("is-hidden", screenName !== "courses");
+  elements.betSettingsScreen.classList.toggle("is-hidden", screenName !== "bets");
+  elements.helpScreen.classList.toggle("is-hidden", screenName !== "help");
+  elements.aboutScreen.classList.toggle("is-hidden", screenName !== "about");
+  document.body.classList.toggle("is-scoring", isScoringScreen);
+  elements.modeStatus.classList.toggle("is-hidden", isScoringScreen);
+  elements.rosterCloudStatus.classList.toggle("is-hidden", isScoringScreen);
+  renderAccessMode();
 }
 
 function scrollToTop() {
   window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+}
+
+function scrollToScoring() {
+  elements.holePlayers.scrollIntoView({ behavior: "auto", block: "start" });
+}
+
+function getCurrentScorerName() {
+  return members.find((member) => member.id === currentScorerId)?.name || "Scorer";
+}
+
+function renderAccessMode() {
+  if (!elements.modeStatus) return;
+
+  elements.adminOnlyItems.forEach((item) => {
+    item.classList.toggle("is-hidden", !commissionerMode);
+  });
+
+  elements.toggleCommissionerMode.textContent = commissionerMode
+    ? "Commissioner Mode: On"
+    : "Commissioner Mode: Off";
+  elements.toggleCommissionerMode.classList.toggle("is-on", commissionerMode);
+  elements.menuCommissionerPinLabel.classList.toggle("is-hidden", commissionerMode);
+
+  if (commissionerMode) {
+    elements.modeStatus.textContent = "Commissioner View: event setup, player management, reset, and all groups are unlocked.";
+    elements.showPlayerManagement.disabled = false;
+    return;
+  }
+
+  elements.modeStatus.textContent = currentScorerId
+    ? `Scorer View: ${getCurrentScorerName()} can enter scores for their assigned group.`
+    : "Scorer View: choose your name, or enter the Commissioner PIN to create/manage an event.";
+  elements.showPlayerManagement.disabled = true;
+}
+
+function closeMenu() {
+  elements.appMenu.classList.add("is-hidden");
+  elements.menuToggle.setAttribute("aria-expanded", "false");
+}
+
+function toggleMenu() {
+  const isOpen = elements.appMenu.classList.toggle("is-hidden") === false;
+  elements.menuToggle.setAttribute("aria-expanded", String(isOpen));
+}
+
+function showAdminRequiredMessage(message) {
+  renderScorerSelection();
+  elements.scorerAccessStatus.textContent = message || "Turn on Commissioner Mode from the menu to use that tool.";
+}
+
+async function openSetupWizard({ focusTeamSetup = false } = {}) {
+  if (!commissionerMode) {
+    showAdminRequiredMessage("Turn on Commissioner Mode to start the setup wizard.");
+    return;
+  }
+
+  await loadRosterFromCloud();
+
+  if (roundState || roundStorage.getUnfinished()) {
+    await clearRoundCacheForReset();
+  }
+
+  roundSettings = null;
+  pendingRoundSettings = null;
+  roundState = null;
+  selectedPlayers = [];
+  currentGroupIndex = 0;
+  groupHoleIndexes = [];
+  completedRoundSaved = false;
+  renderSetupView(elements, courses, members);
+  setActiveScreen("setup");
+  scrollToTop();
+
+  if (focusTeamSetup) {
+    elements.gameList.querySelector('[data-game-enabled="teamChallenge"]')?.focus();
+  }
+}
+
+function showLiveScoring() {
+  if (!roundState) {
+    if (commissionerMode) {
+      openSetupWizard();
+      return;
+    }
+
+    renderScorerSelection();
+    elements.scorerAccessStatus.textContent = "No active round yet. Ask the commissioner to start one.";
+    return;
+  }
+
+  setActiveScreen("round");
+  renderApp();
+  scrollToScoring();
+}
+
+function showLeaderboard() {
+  showLiveScoring();
+
+  if (roundState) {
+    elements.leaderboard.scrollIntoView({ behavior: "auto", block: "start" });
+  }
+}
+
+function showSimpleScreen(screenName) {
+  setActiveScreen(screenName);
+  scrollToTop();
+}
+
+function setCommissionerMode(isOn) {
+  commissionerMode = isOn;
+  currentScorerId = isOn ? null : currentScorerId;
+
+  if (isOn) {
+    scorerStorage.clearScorerId();
+  }
+
+  scorerStorage.setCommissionerMode(isOn);
+  renderAccessMode();
+
+  if (!isOn) {
+    if (roundState && currentScorerId) {
+      currentGroupIndex = getAssignedGroupIndex(currentScorerId);
+      setActiveScreen("round");
+      renderApp();
+      scrollToScoring();
+      return;
+    }
+
+    renderScorerSelection();
+  }
+}
+
+function turnOnCommissionerFromMenu() {
+  if (elements.menuCommissionerPin.value !== scorerStorage.commissionerPin) {
+    elements.modeStatus.textContent = "Wrong Commissioner PIN. Admin tools stayed locked.";
+    elements.menuCommissionerPin.value = "";
+    elements.menuCommissionerPin.focus();
+    return false;
+  }
+
+  elements.menuCommissionerPin.value = "";
+  setCommissionerMode(true);
+  return true;
+}
+
+async function handleMenuAction(action) {
+  closeMenu();
+
+  if (action === "setup") {
+    await openSetupWizard();
+    return;
+  }
+
+  if (action === "scoring") {
+    showLiveScoring();
+    return;
+  }
+
+  if (action === "leaderboard") {
+    showLeaderboard();
+    return;
+  }
+
+  if (action === "players") {
+    showPlayerManagement();
+    return;
+  }
+
+  if (action === "courses") {
+    if (!commissionerMode) {
+      showAdminRequiredMessage("Turn on Commissioner Mode to manage courses.");
+      return;
+    }
+
+    showSimpleScreen("courses");
+    return;
+  }
+
+  if (action === "bets") {
+    if (!commissionerMode) {
+      showAdminRequiredMessage("Turn on Commissioner Mode to edit bet settings.");
+      return;
+    }
+
+    showSimpleScreen("bets");
+    return;
+  }
+
+  if (action === "teams") {
+    await openSetupWizard({ focusTeamSetup: true });
+    return;
+  }
+
+  if (action === "previous") {
+    showPreviousRounds();
+    return;
+  }
+
+  if (action === "help" || action === "about") {
+    showSimpleScreen(action);
+  }
 }
 
 function showRosterCloudStatus(message) {
@@ -124,19 +335,23 @@ function renderHoleStatus() {
         .filter((item) => roundSettings.groupScorers?.[item.index] === currentScorerId);
 
   elements.currentHoleStatus.textContent =
-    `Current Hole: ${roundState.currentHoleIndex + 1} of ${roundState.totalHoles}`;
+    isGroupComplete(currentGroupIndex)
+      ? `Group ${currentGroupIndex + 1} complete`
+      : `Current Hole: ${roundState.currentHoleIndex + 1} of ${roundState.totalHoles}`;
   elements.currentGroupStatus.textContent =
     `Group ${currentGroupIndex + 1} of ${roundSettings.groups.length}`;
   elements.groupSwitcher.innerHTML = visibleGroups
     .map(({ group, index }) => {
       const groupHole = groupHoleIndexes[index] ?? 0;
-      const completeText = isGroupComplete(index) ? "complete" : `Hole ${groupHole + 1}`;
+      const completeText = isGroupComplete(index) ? "complete" : `Hole ${Math.min(groupHole + 1, roundState.totalHoles)}`;
       return `<option value="${index}"${index === currentGroupIndex ? " selected" : ""}>Group ${index + 1} - ${completeText} - ${group.length} players</option>`;
     })
     .join("");
   elements.previousGroup.disabled = !commissionerMode || currentGroupIndex === 0;
   elements.nextGroup.disabled = !commissionerMode || currentGroupIndex === roundSettings.groups.length - 1;
   elements.groupSwitcher.disabled = !commissionerMode;
+  elements.saveHole.disabled = isGroupComplete(currentGroupIndex) && !commissionerMode;
+  elements.nextHole.disabled = isGroupComplete(currentGroupIndex) && !commissionerMode;
 }
 
 function renderCurrentHole() {
@@ -173,7 +388,13 @@ function getNextOpenGroupIndex(startingIndex) {
     }
   }
 
-  return startingIndex;
+  return null;
+}
+
+function areAllGroupsComplete() {
+  if (!roundSettings?.groups?.length) return false;
+
+  return roundSettings.groups.every((group, index) => isGroupComplete(index));
 }
 
 function syncRoundStateToCurrentGroup() {
@@ -190,7 +411,7 @@ function goToGroup(nextGroupIndex) {
   currentGroupIndex = Math.max(0, Math.min(roundSettings.groups.length - 1, nextGroupIndex));
   syncRoundStateToCurrentGroup();
   renderApp();
-  scrollToTop();
+  scrollToScoring();
 }
 
 function goToHoleForCurrentGroup(nextHoleIndex) {
@@ -260,33 +481,7 @@ function enterScorer(playerId) {
     syncRoundStateToCurrentGroup();
     setActiveScreen("round");
     renderApp();
-    scrollToTop();
-    return;
-  }
-
-  renderScorerSelection();
-  elements.scorerAccessStatus.textContent = "Scorers wait here. Commissioner View creates the active event.";
-}
-
-function enterCommissioner() {
-  if (elements.commissionerPin.value !== scorerStorage.commissionerPin) {
-    elements.scorerAccessStatus.textContent = "Wrong PIN.";
-    return;
-  }
-
-  commissionerMode = true;
-  scorerStorage.setCommissionerMode(true);
-  elements.commissionerPin.value = "";
-
-  if (roundState) {
-    setActiveScreen("round");
-    renderApp();
-    scrollToTop();
-    return;
-  }
-
-  if (commissionerMode) {
-    setActiveScreen("setup");
+    scrollToScoring();
     return;
   }
 
@@ -348,7 +543,10 @@ async function autoSaveUnfinishedRound(savedGroupIndex, savedHoleIndex) {
   const autoSaveData = roundState.getAutoSaveExport();
   autoSaveData.groupHoleIndexes = groupHoleIndexes;
   autoSaveData.currentGroupIndex = currentGroupIndex;
-  autoSaveData.currentHoleIndex = groupHoleIndexes[currentGroupIndex] ?? roundState.currentHoleIndex;
+  autoSaveData.currentHoleIndex = Math.min(
+    groupHoleIndexes[currentGroupIndex] ?? roundState.currentHoleIndex,
+    roundState.totalHoles - 1
+  );
   autoSaveData.currentHole = autoSaveData.currentHoleIndex + 1;
   const cloudResult = await roundCloudService.loadActiveRound();
   const mergedData = mergeActiveRound(autoSaveData, cloudResult.round, savedGroupIndex, savedHoleIndex);
@@ -366,9 +564,11 @@ function saveCompletedRound() {
 }
 
 function showFinalSummary() {
-  saveCompletedRound();
   setActiveScreen("summary");
   renderFinalSummary(elements, roundState);
+  elements.cloudSaveStatus.textContent = completedRoundSaved
+    ? "Final scores recorded."
+    : "Review scores, then tap Confirm Final Scores.";
   scrollToTop();
 }
 
@@ -377,7 +577,21 @@ function reviewScorecard() {
   renderApp();
 }
 
-function startFreshRound() {
+function startFreshRound({ clearSavedRound = false } = {}) {
+  if (!commissionerMode) {
+    renderScorerSelection();
+    elements.scorerAccessStatus.textContent = "Enter Commissioner View to start a new event.";
+    return;
+  }
+
+  if (clearSavedRound) {
+    clearRoundCacheForReset().then((result) => {
+      elements.modeStatus.textContent = result.ok
+        ? "Commissioner View: old saved round cleared."
+        : "Commissioner View: local saved round cleared. Cloud active round could not be cleared.";
+    });
+  }
+
   roundSettings = null;
   pendingRoundSettings = null;
   roundState = null;
@@ -396,18 +610,32 @@ function startNewRound() {
   startFreshRound();
 }
 
+async function clearRoundCacheForReset() {
+  roundStorage.clearUnfinished();
+  scorerStorage.clearScorerId();
+  currentScorerId = null;
+  return roundCloudService.clearActiveRound();
+}
+
 function discardSavedRound() {
   roundStorage.clearUnfinished();
-  startFreshRound();
+  startFreshRound({ clearSavedRound: true });
 }
 
 function saveRound() {
   saveCompletedRound();
+  elements.cloudSaveStatus.textContent = "Final scores recorded on this device.";
+  renderFinalSummary(elements, roundState);
 }
 
 async function saveRoundToCloud() {
   if (!roundState || !roundState.isRoundComplete()) {
     elements.cloudSaveStatus.textContent = "Finish the round before saving to cloud.";
+    return;
+  }
+
+  if (!completedRoundSaved) {
+    elements.cloudSaveStatus.textContent = "Confirm final scores before saving to cloud.";
     return;
   }
 
@@ -536,12 +764,16 @@ async function saveRosterToCloud() {
 function undoLastHole() {
   if (!roundState) return;
 
-  const lastSavedHoleIndex = roundState.getLastSavedHoleIndex();
+  const currentGroupPlayers = getCurrentGroupPlayers();
+  const lastSavedHoleIndex = roundState.getLastSavedHoleIndexForPlayers(currentGroupPlayers);
 
   if (lastSavedHoleIndex < 0) {
-    elements.saveStatusMessage.textContent = "No saved holes to undo.";
+    elements.saveStatusMessage.textContent = "No saved holes to undo for this group.";
     return;
   }
+
+  roundState.clearHoleForPlayers(lastSavedHoleIndex, currentGroupPlayers);
+  groupHoleIndexes[currentGroupIndex] = lastSavedHoleIndex;
 
   if (completedRoundSaved) {
     roundStorage.remove(roundState.id);
@@ -549,13 +781,12 @@ function undoLastHole() {
   }
 
   window.clearTimeout(statusTimer);
-  elements.saveStatusMessage.textContent = "";
+  elements.saveStatusMessage.textContent = `Hole ${lastSavedHoleIndex + 1} undone for Group ${currentGroupIndex + 1}.`;
   setActiveScreen("round");
-  groupHoleIndexes = groupHoleIndexes.map((holeIndex) => Math.min(holeIndex, lastSavedHoleIndex));
   syncRoundStateToCurrentGroup();
   renderApp();
   autoSaveUnfinishedRound();
-  scrollToTop();
+  scrollToScoring();
 }
 
 function continueToGroups() {
@@ -611,7 +842,7 @@ function beginGroupedRound() {
   setActiveScreen("round");
   renderApp();
   autoSaveUnfinishedRound();
-  scrollToTop();
+  scrollToScoring();
 }
 
 function loadSavedRoundIntoState(savedRound) {
@@ -658,7 +889,7 @@ function resumeSavedRound() {
 
   setActiveScreen("round");
   renderApp();
-  scrollToTop();
+  scrollToScoring();
 }
 
 async function initializeApp() {
@@ -680,10 +911,15 @@ async function initializeApp() {
   if (activeRound) {
     loadSavedRoundIntoState(activeRound);
 
-    if (currentScorerId || commissionerMode) {
+    if (commissionerMode) {
+      showResumePrompt(activeRound);
+      return;
+    }
+
+    if (currentScorerId) {
       setActiveScreen("round");
       renderApp();
-      scrollToTop();
+      scrollToScoring();
       return;
     }
 
@@ -697,18 +933,51 @@ async function initializeApp() {
     return;
   }
 
-  setActiveScreen("setup");
+  if (commissionerMode) {
+    setActiveScreen("setup");
+    return;
+  }
+
+  renderScorerSelection();
 }
 
 initializeApp();
 
+elements.menuToggle.addEventListener("click", toggleMenu);
+elements.toggleCommissionerMode.addEventListener("click", () => {
+  const changed = commissionerMode
+    ? (setCommissionerMode(false), true)
+    : turnOnCommissionerFromMenu();
+
+  if (!changed) return;
+
+  closeMenu();
+
+  if (commissionerMode && !roundState) {
+    setActiveScreen("setup");
+    return;
+  }
+
+  if (commissionerMode && roundState) {
+    setActiveScreen("round");
+    renderApp();
+    scrollToScoring();
+  }
+});
+elements.appMenu.addEventListener("click", (event) => {
+  const menuButton = event.target.closest("[data-menu-action]");
+
+  if (!menuButton) return;
+
+  handleMenuAction(menuButton.dataset.menuAction);
+});
 elements.startRound.addEventListener("click", continueToGroups);
 elements.backToRoundSetup.addEventListener("click", backToRoundSetup);
 elements.beginGroupedRound.addEventListener("click", reviewEventSummary);
 elements.backToGroupSetup.addEventListener("click", backToGroupSetup);
 elements.confirmStartRound.addEventListener("click", beginGroupedRound);
 elements.resumeRound.addEventListener("click", resumeSavedRound);
-elements.startFreshRound.addEventListener("click", startFreshRound);
+elements.startFreshRound.addEventListener("click", () => startFreshRound({ clearSavedRound: true }));
 elements.discardSavedRound.addEventListener("click", discardSavedRound);
 elements.scorerList.addEventListener("click", (event) => {
   const scorerButton = event.target.closest("[data-scorer-id]");
@@ -717,8 +986,6 @@ elements.scorerList.addEventListener("click", (event) => {
 
   enterScorer(scorerButton.dataset.scorerId);
 });
-elements.enterCommissionerMode.addEventListener("click", enterCommissioner);
-
 elements.holePlayers.addEventListener("click", (event) => {
   if (!roundState) return;
 
@@ -759,18 +1026,29 @@ elements.saveHole.addEventListener("click", async () => {
   if (!roundState) return;
 
   syncRoundStateToCurrentGroup();
-  const savedHoleIndex = groupHoleIndexes[currentGroupIndex] ?? roundState.currentHoleIndex;
+  const savedHoleIndex = Math.min(
+    groupHoleIndexes[currentGroupIndex] ?? roundState.currentHoleIndex,
+    roundState.totalHoles - 1
+  );
   const savedGroupIndex = currentGroupIndex;
   const isLastHole = savedHoleIndex === roundState.totalHoles - 1;
   roundState.saveCurrentHole(getCurrentGroupPlayers());
 
-  if (roundState.isRoundComplete()) {
+  if (isLastHole) {
+    groupHoleIndexes[savedGroupIndex] = roundState.totalHoles;
+  }
+
+  if (roundState.isRoundComplete() || areAllGroupsComplete()) {
     showFinalSummary();
     return;
   }
 
   if (isLastHole) {
-    currentGroupIndex = getNextOpenGroupIndex(savedGroupIndex);
+    const nextOpenGroupIndex = commissionerMode ? getNextOpenGroupIndex(savedGroupIndex) : null;
+
+    if (nextOpenGroupIndex !== null) {
+      currentGroupIndex = nextOpenGroupIndex;
+    }
   } else {
     groupHoleIndexes[savedGroupIndex] = savedHoleIndex + 1;
   }
@@ -782,18 +1060,21 @@ elements.saveHole.addEventListener("click", async () => {
   }
   renderApp();
   showSaveStatus(savedHoleIndex, savedGroupIndex);
-  scrollToTop();
+  scrollToScoring();
 });
 
-elements.resetScores.addEventListener("click", () => {
+elements.resetScores.addEventListener("click", async () => {
   if (!commissionerMode) {
     renderScorerSelection();
     elements.scorerAccessStatus.textContent = "Only the commissioner can cancel the active event.";
     return;
   }
 
-  roundStorage.clearUnfinished();
+  const resetResult = await clearRoundCacheForReset();
   startFreshRound();
+  elements.modeStatus.textContent = resetResult.ok
+    ? "Commissioner View: reset complete. In-progress round cache cleared."
+    : "Commissioner View: local cache cleared. Cloud active round could not be cleared.";
   scrollToTop();
 });
 
@@ -814,7 +1095,6 @@ elements.changeScorer.addEventListener("click", () => {
   commissionerMode = false;
   renderScorerSelection();
 });
-elements.commissionerView.addEventListener("click", renderScorerSelection);
 elements.viewOverallLeaderboard.addEventListener("click", () => {
   elements.leaderboard.scrollIntoView({ behavior: "auto", block: "start" });
 });

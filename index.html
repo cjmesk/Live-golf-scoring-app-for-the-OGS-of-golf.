@@ -4,22 +4,42 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OG&apos;s Golf</title>
-  <link rel="stylesheet" href="src/styles/main.css">
+  <link rel="stylesheet" href="src/styles/main.css?v=20260709-score-scroll">
 </head>
 <body>
   <header class="app-header">
+    <button id="menuToggle" type="button" class="menu-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
     <div>
       <p class="eyebrow">Twelve Stones Golf Club</p>
       <h1>OG&apos;s Golf</h1>
     </div>
-    <button id="resetScores" type="button" class="reset-button">Reset</button>
+    <button id="resetScores" type="button" class="reset-button admin-only">Reset</button>
   </header>
 
+  <nav id="appMenu" class="app-menu is-hidden" aria-label="Main menu">
+    <label id="menuCommissionerPinLabel" class="menu-pin-label" for="menuCommissionerPin">
+      Commissioner PIN
+      <input id="menuCommissionerPin" class="field-control" type="password" inputmode="numeric" autocomplete="off">
+    </label>
+    <button id="toggleCommissionerMode" type="button" class="menu-mode-button">Commissioner Mode: Off</button>
+    <button type="button" data-menu-action="setup" class="admin-only">New Round / Setup Wizard</button>
+    <button type="button" data-menu-action="scoring">Live Scoring</button>
+    <button type="button" data-menu-action="leaderboard">Leaderboard</button>
+    <button type="button" data-menu-action="players" class="admin-only">Player Management</button>
+    <button type="button" data-menu-action="courses" class="admin-only">Course Management</button>
+    <button type="button" data-menu-action="bets" class="admin-only">Bet Settings</button>
+    <button type="button" data-menu-action="teams" class="admin-only">Team Event Setup</button>
+    <button type="button" data-menu-action="previous">Previous Rounds</button>
+    <button type="button" data-menu-action="help">Help</button>
+    <button type="button" data-menu-action="about">About</button>
+  </nav>
+
   <main>
-    <div class="top-actions">
+    <div class="top-actions is-hidden">
       <button id="showPreviousRounds" type="button" class="secondary-button">Previous Rounds</button>
-      <button id="showPlayerManagement" type="button" class="secondary-button">Player Management</button>
+      <button id="showPlayerManagement" type="button" class="secondary-button admin-only">Player Management</button>
     </div>
+    <div id="modeStatus" class="cloud-save-status"></div>
     <div id="rosterCloudStatus" class="cloud-save-status is-hidden"></div>
 
     <section id="resumeScreen" class="resume-section is-hidden" aria-labelledby="resumeTitle">
@@ -53,32 +73,26 @@
       <div class="setup-panel">
         <span class="player-details">Only assigned cart scorers need to choose a name. Other players do not need to open the app.</span>
         <div id="scorerList" class="member-list"></div>
-      </div>
-
-      <div class="setup-panel">
-        <h3>Commissioner View</h3>
-        <label class="field-label" for="commissionerPin">PIN</label>
-        <input id="commissionerPin" class="field-control" type="password" inputmode="numeric">
-        <button id="enterCommissionerMode" type="button" class="save-button">Open Commissioner View</button>
         <div id="scorerAccessStatus" class="player-details"></div>
       </div>
     </section>
 
-    <section id="setupScreen" class="setup-section" aria-labelledby="setupTitle">
+    <section id="setupScreen" class="setup-section is-hidden" aria-labelledby="setupTitle">
       <div class="setup-header">
         <div>
-          <p class="eyebrow dark">Round Setup</p>
+          <p class="eyebrow dark">Morning Setup Wizard</p>
           <h2 id="setupTitle">Start a Round</h2>
         </div>
       </div>
 
       <div class="setup-panel">
+        <strong>Step 1: Course</strong>
         <label class="field-label" for="courseSelect">Course</label>
         <select id="courseSelect" class="field-control"></select>
       </div>
 
       <div class="setup-panel">
-        <h3>Players</h3>
+        <h3>Step 1: Who is playing today?</h3>
         <div class="setup-tools">
           <input id="memberSearch" class="field-control" type="search" placeholder="Search roster">
           <span id="selectedPlayerCount" class="player-details">0 selected</span>
@@ -87,8 +101,14 @@
       </div>
 
       <div class="setup-panel">
-        <h3>Games</h3>
+        <h3>Step 2: What games are being played?</h3>
         <div id="gameList" class="game-list"></div>
+      </div>
+
+      <div id="teamAssignmentPanel" class="setup-panel is-hidden">
+        <h3>Step 3: Team assignment</h3>
+        <span class="player-details">Only players checked as playing today appear here.</span>
+        <div id="teamAssignmentList" class="member-list"></div>
       </div>
 
       <button id="startRound" type="button" class="save-button start-button">Continue to Groups</button>
@@ -121,7 +141,7 @@
       <div class="setup-header">
         <div>
           <p class="eyebrow dark">Event Summary</p>
-          <h2 id="eventSummaryTitle">Today's Event</h2>
+          <h2 id="eventSummaryTitle">Step 4: Start Round</h2>
         </div>
       </div>
 
@@ -134,21 +154,13 @@
     </section>
 
     <div id="roundScreen" class="round-screen is-hidden">
-      <section class="round-settings-section" aria-labelledby="roundSettingsTitle">
-        <h2 id="roundSettingsTitle">Round Settings</h2>
-        <div id="roundSettingsSummary" class="round-settings-summary"></div>
-        <div class="scorer-actions">
-          <button id="changeScorer" type="button" class="secondary-button">Not you? Change scorer</button>
-          <button id="commissionerView" type="button" class="secondary-button">Commissioner View</button>
-          <button id="viewOverallLeaderboard" type="button" class="secondary-button">View Overall Leaderboard</button>
-        </div>
-      </section>
-
       <section class="hole-section" aria-labelledby="holeTitle">
       <div class="round-status-bar">
-        <span id="saveStatusMessage" class="save-status-message"></span>
         <span id="currentHoleStatus" class="current-hole-status">Current Hole: 1 of 18</span>
+        <span id="saveStatusMessage" class="save-status-message"></span>
       </div>
+
+      <div id="holePlayers" class="hole-players"></div>
 
       <div class="hole-summary">
         <div>
@@ -157,8 +169,6 @@
         </div>
         <div id="holeDetails" class="hole-details"></div>
       </div>
-
-      <div id="holePlayers" class="hole-players"></div>
 
       <div class="group-nav-row">
         <button id="previousGroup" type="button" class="secondary-button">Previous Group</button>
@@ -175,6 +185,15 @@
         <button id="nextHole" type="button" class="secondary-button">Next Hole</button>
         <button id="undoLastHole" type="button" class="secondary-button">Undo Last Hole</button>
       </div>
+      </section>
+
+      <section class="round-settings-section" aria-labelledby="roundSettingsTitle">
+        <h2 id="roundSettingsTitle">Round Settings</h2>
+        <div id="roundSettingsSummary" class="round-settings-summary"></div>
+        <div class="scorer-actions">
+          <button id="changeScorer" type="button" class="secondary-button">Not you? Change scorer</button>
+          <button id="viewOverallLeaderboard" type="button" class="secondary-button">View Overall Leaderboard</button>
+        </div>
       </section>
 
       <section class="leaderboard-section" aria-labelledby="leaderboardTitle">
@@ -197,7 +216,7 @@
       <div class="setup-header">
         <div>
           <p class="eyebrow dark">End of Round</p>
-          <h2 id="summaryTitle">Final Summary</h2>
+          <h2 id="summaryTitle">Review Final Scores</h2>
         </div>
       </div>
 
@@ -206,9 +225,9 @@
       <div class="summary-actions">
         <button id="reviewScorecard" type="button" class="secondary-button">Review Scorecard</button>
         <button id="summaryUndoLastHole" type="button" class="secondary-button">Undo Last Hole</button>
-        <button id="saveRound" type="button" class="save-button">Save Round</button>
+        <button id="saveRound" type="button" class="save-button">Confirm Final Scores</button>
         <button id="saveRoundCloud" type="button" class="save-button">Save Completed Round to Cloud</button>
-        <button id="startNewRound" type="button" class="secondary-button">Start New Round</button>
+        <button id="startNewRound" type="button" class="secondary-button admin-only">Start New Round</button>
       </div>
       <div id="cloudSaveStatus" class="cloud-save-status"></div>
     </section>
@@ -286,33 +305,87 @@
       <div id="playerManagementStatus" class="cloud-save-status"></div>
       <div id="playerManagementList" class="member-list"></div>
     </section>
+
+    <section id="courseManagementScreen" class="setup-section is-hidden" aria-labelledby="courseManagementTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">Admin</p>
+          <h2 id="courseManagementTitle">Course Management</h2>
+        </div>
+      </div>
+      <div class="setup-panel">
+        <strong>Twelve Stones Golf Club</strong>
+        <span class="player-details">Course tee data is stored in the app. Full course editing is planned for a later beta.</span>
+      </div>
+    </section>
+
+    <section id="betSettingsScreen" class="setup-section is-hidden" aria-labelledby="betSettingsTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">Admin</p>
+          <h2 id="betSettingsTitle">Bet Settings</h2>
+        </div>
+      </div>
+      <div class="setup-panel">
+        <strong>Game buy-ins are set during the setup wizard.</strong>
+        <span class="player-details">Open New Round / Setup Wizard to choose Points, Net Skins, Team Event, Closest to Pin, Long Drive, and dollar amounts.</span>
+      </div>
+    </section>
+
+    <section id="helpScreen" class="setup-section is-hidden" aria-labelledby="helpTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">Support</p>
+          <h2 id="helpTitle">Help</h2>
+        </div>
+      </div>
+      <div class="setup-panel">
+        <strong>Saturday flow</strong>
+        <span class="player-details">Turn on Commissioner Mode, open New Round / Setup Wizard, check today's players, choose games, assign teams if needed, assign groups/scorers, then start on Hole 1.</span>
+      </div>
+    </section>
+
+    <section id="aboutScreen" class="setup-section is-hidden" aria-labelledby="aboutTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">About</p>
+          <h2 id="aboutTitle">OG&apos;s Golf</h2>
+        </div>
+      </div>
+      <div class="setup-panel">
+        <strong>OG&apos;s Golf v0.9.8 Beta</strong>
+        <span class="player-details">Built for simple league scoring, shared leaderboards, points, skins, and team event setup.</span>
+      </div>
+    </section>
   </main>
 
-  <script src="src/data/course.js"></script>
-  <script src="src/data/players.js"></script>
-  <script src="src/rules/points.js"></script>
-  <script src="src/rules/handicap.js"></script>
-  <script src="src/rules/skins.js"></script>
-  <script src="src/state/playerStorage.js"></script>
-  <script src="src/state/scorerStorage.js"></script>
-  <script src="src/state/roundState.js"></script>
-  <script src="src/state/roundStorage.js"></script>
+  <footer class="app-footer">OGS Golf v0.9.8 Beta</footer>
+
+  <script src="src/data/course.js?v=20260709-v098-menu"></script>
+  <script src="src/data/players.js?v=20260709-v098-menu"></script>
+  <script src="src/rules/points.js?v=20260709-v098-menu"></script>
+  <script src="src/rules/handicap.js?v=20260709-v098-menu"></script>
+  <script src="src/rules/skins.js?v=20260709-v098-menu"></script>
+  <script src="src/state/playerStorage.js?v=20260709-v098-menu"></script>
+  <script src="src/state/scorerStorage.js?v=20260709-v098-menu"></script>
+  <script src="src/state/roundState.js?v=20260709-undo-hole"></script>
+  <script src="src/state/roundStorage.js?v=20260709-v098-menu"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="src/cloud/supabaseConfig.js"></script>
-  <script src="src/cloud/supabaseClient.js"></script>
-  <script src="src/cloud/roundCloudService.js"></script>
-  <script src="src/ui/dom.js"></script>
-  <script src="src/ui/formatters.js"></script>
-  <script src="src/ui/setupView.js"></script>
-  <script src="src/ui/holeView.js"></script>
-  <script src="src/ui/leaderboardView.js"></script>
-  <script src="src/ui/pointsPayoutView.js"></script>
-  <script src="src/ui/skinsView.js"></script>
-  <script src="src/ui/finalSummaryView.js"></script>
-  <script src="src/ui/previousRoundsView.js"></script>
-  <script src="src/ui/playerManagementView.js"></script>
-  <script src="src/ui/groupSetupView.js"></script>
-  <script src="src/ui/eventSummaryView.js"></script>
-  <script src="src/app.js"></script>
+  <script src="src/cloud/supabaseConfig.js?v=20260709-v098-menu"></script>
+  <script src="src/cloud/supabaseClient.js?v=20260709-v098-menu"></script>
+  <script src="src/cloud/roundCloudService.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/dom.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/formatters.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/setupView.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/holeView.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/leaderboardView.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/pointsPayoutView.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/skinsView.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/finalSummaryView.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/previousRoundsView.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/playerManagementView.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/groupSetupView.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/eventSummaryView.js?v=20260709-v098-menu"></script>
+  <script src="src/app.js?v=20260709-confirm-final"></script>
 </body>
 </html>

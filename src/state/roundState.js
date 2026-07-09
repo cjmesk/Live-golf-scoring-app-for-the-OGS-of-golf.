@@ -243,6 +243,16 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     return -1;
   }
 
+  function getLastSavedHoleIndexForPlayers(playersToCheck = players) {
+    for (let index = totalHoles - 1; index >= 0; index -= 1) {
+      const isSaved = playersToCheck.every((player) => savedScores[player.id][index] !== null);
+
+      if (isSaved) return index;
+    }
+
+    return -1;
+  }
+
   function getFinalSummary() {
     return {
       grossWinner: getLowestScoreLeaders("gross"),
@@ -259,6 +269,30 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         }
       }))
     };
+  }
+
+  function getTeamChallengeTeams() {
+    if (!roundSettings.games.teamChallenge?.enabled) return [];
+
+    const teamMap = new Map();
+
+    players.forEach((player) => {
+      if (!player.teamId) return;
+
+      if (!teamMap.has(player.teamId)) {
+        teamMap.set(player.teamId, {
+          id: player.teamId,
+          label: player.teamId.replace("team-", "Team "),
+          players: []
+        });
+      }
+
+      teamMap.get(player.teamId).players.push(player);
+    });
+
+    return Array.from(teamMap.values()).sort((firstTeam, secondTeam) =>
+      firstTeam.id.localeCompare(secondTeam.id)
+    );
   }
 
   function getRoundExport() {
@@ -288,6 +322,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       netSkin: getSkinForHole(holeIndex)
     }));
     const finalSummary = getFinalSummary();
+    const teamChallengeTeams = getTeamChallengeTeams();
 
     return {
       id: roundId,
@@ -310,12 +345,23 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         inPoints: isInPoints(player),
         inClosestToPin: player.inClosestToPin !== false,
         inLongDrive: player.inLongDrive !== false,
+        inTeamChallenge: player.inTeamChallenge === true,
+        teamId: player.teamId || "",
         courseHandicap: courseHandicaps[player.id]
       })),
       holeByHole,
       savedScores,
       savedHoleResults,
       skinResults,
+      teamChallenge: {
+        enabled: roundSettings.games.teamChallenge?.enabled === true,
+        teams: teamChallengeTeams.map((team) => ({
+          id: team.id,
+          label: team.label,
+          playerIds: team.players.map((player) => player.id),
+          playerNames: team.players.map((player) => player.name)
+        }))
+      },
       totals: finalSummary.playerTotals.map((item) => ({
         playerId: item.player.id,
         playerName: item.player.name,
@@ -380,11 +426,22 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         inPoints: isInPoints(player),
         inClosestToPin: player.inClosestToPin !== false,
         inLongDrive: player.inLongDrive !== false,
+        inTeamChallenge: player.inTeamChallenge === true,
+        teamId: player.teamId || "",
         courseHandicap: courseHandicaps[player.id]
       })),
       savedScores,
       savedHoleResults,
       skinResults,
+      teamChallenge: {
+        enabled: roundSettings.games.teamChallenge?.enabled === true,
+        teams: getTeamChallengeTeams().map((team) => ({
+          id: team.id,
+          label: team.label,
+          playerIds: team.players.map((player) => player.id),
+          playerNames: team.players.map((player) => player.name)
+        }))
+      },
       totals,
       points: getPointsSummary(),
       netSkins: getSkinSummary()
@@ -421,6 +478,24 @@ window.OGSGolf.state.createRoundState = function createRoundState(
 
     savedHoleResults[currentHoleIndex] = holeResults;
     recalculateSkins();
+  }
+
+  function clearHoleForPlayers(holeIndex, playersToClear = players) {
+    const playerIdsToClear = new Set(playersToClear.map((player) => player.id));
+
+    playersToClear.forEach((player) => {
+      savedScores[player.id][holeIndex] = null;
+    });
+
+    savedHoleResults[holeIndex] = (savedHoleResults[holeIndex] || [])
+      .filter((result) => !playerIdsToClear.has(result.playerId));
+
+    if (savedHoleResults[holeIndex].length === 0) {
+      savedHoleResults[holeIndex] = null;
+    }
+
+    recalculateSkins();
+    goToHole(holeIndex);
   }
 
   function goToHole(nextHoleIndex) {
@@ -464,15 +539,18 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     getLeaderboardStandings,
     getStrokesForPlayerOnHole,
     getSkinSummary,
+    getTeamChallengeTeams,
     isInSkins,
     isInPoints,
     isRoundComplete,
     getLastSavedHoleIndex,
+    getLastSavedHoleIndexForPlayers,
     getFinalSummary,
     getRoundExport,
     getAutoSaveExport,
     changeDraftScore,
     saveCurrentHole,
+    clearHoleForPlayers,
     goToHole,
     resetScores
   };

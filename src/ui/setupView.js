@@ -20,15 +20,63 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
   const pointsMemberIds = new Set(selectedMemberIds);
   const closestToPinMemberIds = new Set(selectedMemberIds);
   const longDriveMemberIds = new Set(selectedMemberIds);
+  const teamAssignments = new Map();
   elements.memberList.selectedMemberIds = selectedMemberIds;
   elements.memberList.teeOverrides = teeOverrides;
   elements.memberList.skinsMemberIds = skinsMemberIds;
   elements.memberList.pointsMemberIds = pointsMemberIds;
   elements.memberList.closestToPinMemberIds = closestToPinMemberIds;
   elements.memberList.longDriveMemberIds = longDriveMemberIds;
+  elements.memberList.teamAssignments = teamAssignments;
 
   function updateSelectedCount() {
     elements.selectedPlayerCount.textContent = `${selectedMemberIds.size} selected`;
+  }
+
+  function isTeamChallengeEnabled() {
+    return Boolean(elements.gameList.querySelector('[data-game-enabled="teamChallenge"]')?.checked);
+  }
+
+  function renderTeamAssignments() {
+    const isEnabled = isTeamChallengeEnabled();
+    elements.teamAssignmentPanel.classList.toggle("is-hidden", !isEnabled);
+
+    if (!isEnabled) {
+      elements.teamAssignmentList.innerHTML = "";
+      return;
+    }
+
+    const playingMembers = members.filter((member) => selectedMemberIds.has(member.id));
+
+    if (playingMembers.length === 0) {
+      elements.teamAssignmentList.innerHTML = `<div class="empty-state">Check players as playing today, then assign teams.</div>`;
+      return;
+    }
+
+    elements.teamAssignmentList.innerHTML = playingMembers
+      .map((member) => {
+        const selectedTeam = teamAssignments.get(member.id) || "";
+
+        return `
+          <div class="team-assignment-row">
+            <div>
+              <strong>${member.name}</strong>
+              <span class="player-details">Playing checked | Team Event checked</span>
+            </div>
+            <label class="tee-select-label">
+              <span>Team</span>
+              <select class="field-control" data-team-for="${member.id}">
+                <option value=""${selectedTeam === "" ? " selected" : ""}>Auto</option>
+                <option value="team-1"${selectedTeam === "team-1" ? " selected" : ""}>Team 1</option>
+                <option value="team-2"${selectedTeam === "team-2" ? " selected" : ""}>Team 2</option>
+                <option value="team-3"${selectedTeam === "team-3" ? " selected" : ""}>Team 3</option>
+                <option value="team-4"${selectedTeam === "team-4" ? " selected" : ""}>Team 4</option>
+              </select>
+            </label>
+          </div>
+        `;
+      })
+      .join("");
   }
 
   function renderMemberRows() {
@@ -108,21 +156,19 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
 
     if (checkbox?.checked) {
       selectedMemberIds.add(checkbox.dataset.memberId);
-      skinsMemberIds.add(checkbox.dataset.memberId);
-      pointsMemberIds.add(checkbox.dataset.memberId);
-      closestToPinMemberIds.add(checkbox.dataset.memberId);
-      longDriveMemberIds.add(checkbox.dataset.memberId);
     } else if (checkbox) {
       selectedMemberIds.delete(checkbox.dataset.memberId);
       skinsMemberIds.delete(checkbox.dataset.memberId);
       pointsMemberIds.delete(checkbox.dataset.memberId);
       closestToPinMemberIds.delete(checkbox.dataset.memberId);
       longDriveMemberIds.delete(checkbox.dataset.memberId);
+      teamAssignments.delete(checkbox.dataset.memberId);
     }
 
     if (checkbox) {
       updateSelectedCount();
       renderMemberRows();
+      renderTeamAssignments();
       return;
     }
 
@@ -187,6 +233,27 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
     </select>
   `;
   elements.gameList.appendChild(skinsModeRow);
+
+  elements.gameList.onchange = (event) => {
+    if (event.target.closest('[data-game-enabled="teamChallenge"]')) {
+      renderTeamAssignments();
+    }
+  };
+
+  elements.teamAssignmentList.onchange = (event) => {
+    const teamSelect = event.target.closest("[data-team-for]");
+
+    if (!teamSelect) return;
+
+    if (teamSelect.value) {
+      teamAssignments.set(teamSelect.dataset.teamFor, teamSelect.value);
+      return;
+    }
+
+    teamAssignments.delete(teamSelect.dataset.teamFor);
+  };
+
+  renderTeamAssignments();
 };
 
 window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, courses, members) {
@@ -197,16 +264,22 @@ window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, cours
   const pointsMemberIds = elements.memberList.pointsMemberIds || new Set();
   const closestToPinMemberIds = elements.memberList.closestToPinMemberIds || new Set();
   const longDriveMemberIds = elements.memberList.longDriveMemberIds || new Set();
+  const teamAssignments = elements.memberList.teamAssignments || new Map();
+  const teamChallengeEnabled = Boolean(elements.gameList.querySelector('[data-game-enabled="teamChallenge"]')?.checked);
   const selectedPlayers = members
     .filter((member) => selectedMemberIds.has(member.id))
     .map((member) => {
+      const teamId = teamChallengeEnabled ? teamAssignments.get(member.id) || "" : "";
+
       return {
         ...member,
         tee: teeOverrides.get(member.id) || member.tee,
         inSkins: skinsMemberIds.has(member.id),
         inPoints: pointsMemberIds.has(member.id),
         inClosestToPin: closestToPinMemberIds.has(member.id),
-        inLongDrive: longDriveMemberIds.has(member.id)
+        inLongDrive: longDriveMemberIds.has(member.id),
+        inTeamChallenge: teamChallengeEnabled && Boolean(teamId),
+        teamId
       };
     });
 
@@ -228,6 +301,15 @@ window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, cours
   return {
     course,
     players: selectedPlayers,
+    teamAssignments: teamChallengeEnabled
+      ? selectedPlayers.reduce((assignments, player) => {
+          if (player.teamId) {
+            assignments[player.id] = player.teamId;
+          }
+
+          return assignments;
+        }, {})
+      : {},
     groups: selectedPlayers.reduce((groups, player, index) => {
       const groupIndex = Math.floor(index / 4);
       groups[groupIndex] = groups[groupIndex] || [];
@@ -250,6 +332,11 @@ window.OGSGolf.ui.renderRoundSettingsSummary = function renderRoundSettingsSumma
   const pointsCount = roundSettings.players.filter((player) => player.inPoints).length;
   const closestCount = roundSettings.players.filter((player) => player.inClosestToPin).length;
   const longDriveCount = roundSettings.players.filter((player) => player.inLongDrive).length;
+  const teamCount = new Set(
+    roundSettings.players
+      .map((player) => player.teamId)
+      .filter(Boolean)
+  ).size;
   const skinsMode = roundSettings.games.netSkins?.skinsHandicapMode === "full"
     ? "Full Handicap Skins"
     : "Half Handicap Skins";
@@ -262,6 +349,7 @@ window.OGSGolf.ui.renderRoundSettingsSummary = function renderRoundSettingsSumma
       </div>
       <div>${groupsText}</div>
       <div>Skins: ${skinsCount} | Points: ${pointsCount} | CTP: ${closestCount} | Long Drive: ${longDriveCount}</div>
+      <div>Team Challenge: ${roundSettings.games.teamChallenge?.enabled ? `${teamCount} assigned team${teamCount === 1 ? "" : "s"}` : "Off"}</div>
       <div>${skinsMode}</div>
       <div>${gamesText}</div>
     </div>
