@@ -222,3 +222,62 @@ window.OGSGolf.cloud.roundCloudService = {
     }
   }
 };
+
+window.OGSGolf.cloud.roundCloudService.savePlayers = async function savePlayers(players) {
+  const config = window.OGSGolf.cloud.supabaseConfig;
+
+  if (!config.url || !config.anonKey) {
+    return {
+      ok: false,
+      reason: "not-configured",
+      message: "Player cloud save is not set up yet. Your roster is saved on this device."
+    };
+  }
+
+  const playerRows = players.map((player) => ({
+    id: player.id,
+    name: player.name,
+    ghin: player.ghin || null,
+    handicap_index: player.handicap,
+    preferred_tee: player.tee,
+    active: player.active
+  }));
+
+  try {
+    const response = await fetch(`${config.url}/rest/v1/players?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.anonKey}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates"
+      },
+      body: JSON.stringify(playerRows)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+
+      if (response.status === 401 && errorText.includes("row-level security")) {
+        return {
+          ok: false,
+          reason: "players-policy-missing",
+          message: "Supabase roster permissions need to be updated. Your roster is still saved on this device."
+        };
+      }
+
+      throw new Error("Player roster request failed.");
+    }
+
+    return {
+      ok: true,
+      message: "Roster saved to Supabase."
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "failed",
+      message: "Cloud roster save failed. Your roster is still saved on this device."
+    };
+  }
+};
