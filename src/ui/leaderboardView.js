@@ -9,7 +9,11 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
       totals: roundState.getPlayerTotals(player)
     }))
     .sort((a, b) => {
-      if (b.totals.points !== a.totals.points) {
+      if (pointsEnabled && roundState.isInPoints(a.player) !== roundState.isInPoints(b.player)) {
+        return roundState.isInPoints(a.player) ? -1 : 1;
+      }
+
+      if (pointsEnabled && b.totals.points !== a.totals.points) {
         return b.totals.points - a.totals.points;
       }
 
@@ -20,6 +24,12 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
 
   standings.forEach((standing, index) => {
     const { player, totals } = standing;
+    const gameStatus = [
+      roundState.isInSkins(player) ? "Skins" : "Not in Skins",
+      roundState.isInPoints(player) ? "Points" : "Not in Points",
+      player.inClosestToPin !== false ? "CTP" : "Not in CTP",
+      player.inLongDrive !== false ? "Long Drive" : "Not in Long Drive"
+    ].join(" | ");
     const row = document.createElement("div");
     row.className = "leaderboard-row";
     row.innerHTML = `
@@ -27,10 +37,12 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
       <div>
         <div class="player-name">${player.name}</div>
         <div class="player-details">${player.tee} tees | ${totals.holesPlayed}/18 holes saved</div>
+        <div class="player-details">${gameStatus}</div>
       </div>
       <div class="leaderboard-totals">
-        ${pointsEnabled ? `<span class="points">${totals.points} pts</span>` : ""}
-        ${pointsEnabled ? `<span class="gross">F9 ${totals.frontPoints} | B9 ${totals.backPoints}</span>` : ""}
+        ${pointsEnabled && roundState.isInPoints(player) ? `<span class="points">${totals.points} pts</span>` : ""}
+        ${pointsEnabled && !roundState.isInPoints(player) ? `<span class="gross">Not in Points</span>` : ""}
+        ${pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">F9 ${totals.frontPoints} | B9 ${totals.backPoints}</span>` : ""}
         <span class="gross">Gross ${totals.gross || "-"}</span>
         <span class="gross">Net ${totals.net || "-"}</span>
       </div>

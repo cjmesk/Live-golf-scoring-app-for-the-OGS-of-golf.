@@ -41,6 +41,28 @@
       </div>
     </section>
 
+    <section id="scorerScreen" class="setup-section is-hidden" aria-labelledby="scorerTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">Scorer Access</p>
+          <h2 id="scorerTitle">Who are you?</h2>
+        </div>
+      </div>
+
+      <div class="setup-panel">
+        <span class="player-details">Only assigned cart scorers need to choose a name. Other players do not need to open the app.</span>
+        <div id="scorerList" class="member-list"></div>
+      </div>
+
+      <div class="setup-panel">
+        <h3>Commissioner View</h3>
+        <label class="field-label" for="commissionerPin">PIN</label>
+        <input id="commissionerPin" class="field-control" type="password" inputmode="numeric">
+        <button id="enterCommissionerMode" type="button" class="save-button">Open Commissioner View</button>
+        <div id="scorerAccessStatus" class="player-details"></div>
+      </div>
+    </section>
+
     <section id="setupScreen" class="setup-section" aria-labelledby="setupTitle">
       <div class="setup-header">
         <div>
@@ -68,13 +90,41 @@
         <div id="gameList" class="game-list"></div>
       </div>
 
-      <button id="startRound" type="button" class="save-button start-button">Start Round</button>
+      <button id="startRound" type="button" class="save-button start-button">Continue to Groups</button>
+    </section>
+
+    <section id="groupSetupScreen" class="group-setup-section is-hidden" aria-labelledby="groupSetupTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">Group Setup</p>
+          <h2 id="groupSetupTitle">Assign Groups</h2>
+        </div>
+      </div>
+
+      <div class="setup-panel">
+        <strong id="groupSetupCount">0 players</strong>
+        <span class="player-details">For tomorrow: two groups of four, one scorer per cart. Everyone stays in one shared event.</span>
+      </div>
+
+      <div id="groupSetupList" class="member-list"></div>
+      <div id="groupScorerList" class="member-list"></div>
+
+      <div class="group-setup-actions">
+        <button id="backToRoundSetup" type="button" class="secondary-button">Back to Round Setup</button>
+        <button id="beginGroupedRound" type="button" class="save-button">Start Round</button>
+      </div>
+      <div id="groupSetupStatus" class="cloud-save-status"></div>
     </section>
 
     <div id="roundScreen" class="round-screen is-hidden">
       <section class="round-settings-section" aria-labelledby="roundSettingsTitle">
         <h2 id="roundSettingsTitle">Round Settings</h2>
         <div id="roundSettingsSummary" class="round-settings-summary"></div>
+        <div class="scorer-actions">
+          <button id="changeScorer" type="button" class="secondary-button">Not you? Change scorer</button>
+          <button id="commissionerView" type="button" class="secondary-button">Commissioner View</button>
+          <button id="viewOverallLeaderboard" type="button" class="secondary-button">View Overall Leaderboard</button>
+        </div>
       </section>
 
       <section class="hole-section" aria-labelledby="holeTitle">
@@ -92,6 +142,15 @@
       </div>
 
       <div id="holePlayers" class="hole-players"></div>
+
+      <div class="group-nav-row">
+        <button id="previousGroup" type="button" class="secondary-button">Previous Group</button>
+        <label class="group-switcher-label">
+          <span id="currentGroupStatus" class="current-hole-status">Group 1 of 1</span>
+          <select id="groupSwitcher" class="field-control"></select>
+        </label>
+        <button id="nextGroup" type="button" class="secondary-button">Next Group</button>
+      </div>
 
       <div class="action-row">
         <button id="previousHole" type="button" class="secondary-button">Previous Hole</button>
@@ -183,8 +242,11 @@
 
         <label class="field-label" for="playerTee">Preferred Tee</label>
         <select id="playerTee" class="field-control">
-          <option value="white">White</option>
+          <option value="black">Black</option>
           <option value="silver">Silver</option>
+          <option value="white">White</option>
+          <option value="gold">Gold</option>
+          <option value="red">Red</option>
         </select>
 
         <label class="game-toggle">
@@ -214,6 +276,7 @@
   <script src="src/rules/handicap.js"></script>
   <script src="src/rules/skins.js"></script>
   <script src="src/state/playerStorage.js"></script>
+  <script src="src/state/scorerStorage.js"></script>
   <script src="src/state/roundState.js"></script>
   <script src="src/state/roundStorage.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -230,6 +293,7 @@
   <script src="src/ui/finalSummaryView.js"></script>
   <script src="src/ui/previousRoundsView.js"></script>
   <script src="src/ui/playerManagementView.js"></script>
+  <script src="src/ui/groupSetupView.js"></script>
   <script src="src/app.js"></script>
 </body>
 </html>

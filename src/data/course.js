@@ -1,66 +1,64 @@
 window.OGSGolf = window.OGSGolf || {};
 window.OGSGolf.data = window.OGSGolf.data || {};
 
-window.OGSGolf.data.courses = [
-{
-  id: "twelve-stones",
-  name: "Twelve Stones Crossing Golf Club",
-  par: 72,
-  teeRatings: {
-    // The official scorecard image available online does not show rating/slope.
-    // Keep these values here so they can be corrected in one place when confirmed.
-    white: {
-      courseRating: 72,
-      slopeRating: 113
-    },
-    silver: {
-      courseRating: 72,
-      slopeRating: 113
-    }
-  },
-  tees: {
-    silver: [
-      { hole: 1, par: 4, handicap: 6, yards: 396 },
-      { hole: 2, par: 3, handicap: 4, yards: 183 },
-      { hole: 3, par: 5, handicap: 8, yards: 520 },
-      { hole: 4, par: 4, handicap: 14, yards: 352 },
-      { hole: 5, par: 4, handicap: 18, yards: 245 },
-      { hole: 6, par: 3, handicap: 12, yards: 198 },
-      { hole: 7, par: 5, handicap: 2, yards: 512 },
-      { hole: 8, par: 4, handicap: 16, yards: 330 },
-      { hole: 9, par: 4, handicap: 10, yards: 371 },
-      { hole: 10, par: 5, handicap: 9, yards: 515 },
-      { hole: 11, par: 4, handicap: 7, yards: 404 },
-      { hole: 12, par: 4, handicap: 5, yards: 362 },
-      { hole: 13, par: 4, handicap: 13, yards: 291 },
-      { hole: 14, par: 5, handicap: 3, yards: 549 },
-      { hole: 15, par: 3, handicap: 17, yards: 153 },
-      { hole: 16, par: 4, handicap: 11, yards: 398 },
-      { hole: 17, par: 3, handicap: 15, yards: 178 },
-      { hole: 18, par: 4, handicap: 1, yards: 401 }
-    ],
-    white: [
-      { hole: 1, par: 4, handicap: 6, yards: 364 },
-      { hole: 2, par: 3, handicap: 4, yards: 155 },
-      { hole: 3, par: 5, handicap: 8, yards: 454 },
-      { hole: 4, par: 4, handicap: 14, yards: 331 },
-      { hole: 5, par: 4, handicap: 18, yards: 201 },
-      { hole: 6, par: 3, handicap: 12, yards: 184 },
-      { hole: 7, par: 5, handicap: 2, yards: 485 },
-      { hole: 8, par: 4, handicap: 16, yards: 304 },
-      { hole: 9, par: 4, handicap: 10, yards: 363 },
-      { hole: 10, par: 5, handicap: 9, yards: 474 },
-      { hole: 11, par: 4, handicap: 7, yards: 378 },
-      { hole: 12, par: 4, handicap: 5, yards: 338 },
-      { hole: 13, par: 4, handicap: 13, yards: 267 },
-      { hole: 14, par: 5, handicap: 3, yards: 492 },
-      { hole: 15, par: 3, handicap: 17, yards: 142 },
-      { hole: 16, par: 4, handicap: 11, yards: 376 },
-      { hole: 17, par: 3, handicap: 15, yards: 167 },
-      { hole: 18, par: 4, handicap: 1, yards: 367 }
-    ]
-  }
+const twelveStonesParByHole = [4, 3, 5, 4, 4, 3, 5, 4, 4, 5, 4, 4, 4, 5, 3, 4, 3, 4];
+const twelveStonesHandicapByHole = [6, 4, 8, 14, 18, 12, 2, 16, 10, 9, 7, 5, 13, 3, 17, 11, 15, 1];
+
+function buildTeeHoles(yardages, status = "verified") {
+  return twelveStonesParByHole.map((par, index) => ({
+    hole: index + 1,
+    par,
+    handicap: twelveStonesHandicapByHole[index],
+    yards: yardages[index],
+    status
+  }));
 }
+
+function getTotalYardage(yardages) {
+  if (yardages.some((yards) => yards === null)) {
+    return null;
+  }
+
+  return yardages.reduce((total, yards) => total + yards, 0);
+}
+
+function buildTeeSummary(label, yardages, courseRating, slopeRating, status = "verified") {
+  return {
+    label,
+    totalYardage: getTotalYardage(yardages),
+    courseRating,
+    slopeRating,
+    status
+  };
+}
+
+const blackYardages = Array(18).fill(null);
+const silverYardages = [396, 183, 520, 352, 245, 198, 512, 330, 371, 515, 404, 362, 291, 549, 153, 398, 178, 401];
+const whiteYardages = [364, 155, 454, 331, 201, 184, 485, 304, 363, 474, 378, 338, 267, 492, 142, 376, 167, 367];
+const goldYardages = Array(18).fill(null);
+const redYardages = Array(18).fill(null);
+
+window.OGSGolf.data.courses = [
+  {
+    id: "twelve-stones",
+    name: "Twelve Stones Crossing Golf Club",
+    par: 72,
+    teeOrder: ["black", "silver", "white", "gold", "red"],
+    teeRatings: {
+      black: buildTeeSummary("Black", blackYardages, 72, 113, "TODO: confirm official yardages, course rating, and slope rating"),
+      silver: buildTeeSummary("Silver", silverYardages, 72, 113, "TODO: confirm official course rating and slope rating"),
+      white: buildTeeSummary("White", whiteYardages, 72, 113, "TODO: confirm official course rating and slope rating"),
+      gold: buildTeeSummary("Gold", goldYardages, 72, 113, "TODO: confirm official yardages, course rating, and slope rating"),
+      red: buildTeeSummary("Red", redYardages, 72, 113, "TODO: confirm official yardages, course rating, and slope rating")
+    },
+    tees: {
+      black: buildTeeHoles(blackYardages, "TODO: confirm official Black tee yardage"),
+      silver: buildTeeHoles(silverYardages),
+      white: buildTeeHoles(whiteYardages),
+      gold: buildTeeHoles(goldYardages, "TODO: confirm official Gold tee yardage"),
+      red: buildTeeHoles(redYardages, "TODO: confirm official Red tee yardage")
+    }
+  }
 ];
 
 window.OGSGolf.data.course = window.OGSGolf.data.courses[0];

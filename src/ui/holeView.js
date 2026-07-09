@@ -4,14 +4,16 @@ window.OGSGolf.ui = window.OGSGolf.ui || {};
 window.OGSGolf.ui.renderHoleView = function renderHoleView(elements, course, players, roundState) {
   const { getPlayerMeta } = window.OGSGolf.ui;
   const currentHoleIndex = roundState.currentHoleIndex;
-  const whiteHole = course.tees.white[currentHoleIndex];
-  const silverHole = course.tees.silver[currentHoleIndex];
+  const teeDetails = course.teeOrder.map((teeId) => {
+    const tee = course.teeRatings[teeId];
+    const hole = course.tees[teeId][currentHoleIndex];
+    const yards = hole.yards === null ? "TODO yds" : `${hole.yards} yds`;
+
+    return `<span>${tee.label}: Par ${hole.par} | ${yards} | HCP ${hole.handicap}</span>`;
+  });
 
   elements.holeTitle.textContent = `Hole ${currentHoleIndex + 1}`;
-  elements.holeDetails.innerHTML = `
-    <span>White: Par ${whiteHole.par} | ${whiteHole.yards} yds | HCP ${whiteHole.handicap}</span>
-    <span>Silver: Par ${silverHole.par} | ${silverHole.yards} yds | HCP ${silverHole.handicap}</span>
-  `;
+  elements.holeDetails.innerHTML = teeDetails.join("");
 
   elements.previousHole.disabled = currentHoleIndex === 0;
   elements.nextHole.disabled = currentHoleIndex === roundState.totalHoles - 1;
@@ -31,7 +33,7 @@ window.OGSGolf.ui.renderHoleView = function renderHoleView(elements, course, pla
       <div class="hole-player-info">
         <div class="player-name">${player.name}</div>
         <div class="player-details">${getPlayerMeta(player)} | CH ${roundState.courseHandicaps[player.id]}</div>
-        <div class="player-details">Par ${hole.par} | ${hole.yards} yds | HCP ${hole.handicap}</div>
+        <div class="player-details">Par ${hole.par} | ${hole.yards === null ? "TODO yds" : `${hole.yards} yds`} | HCP ${hole.handicap}</div>
         <div class="player-details">Strokes ${strokesReceived} | ${statusText} | ${netText}</div>
       </div>
       <div class="score-stepper" aria-label="${player.name} score controls">

@@ -15,14 +15,30 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
 
   const selectedMemberIds = new Set(members.filter((member) => member.active).map((member) => member.id));
   const teeOverrides = new Map();
+  const skinsMemberIds = new Set(selectedMemberIds);
+  const pointsMemberIds = new Set(selectedMemberIds);
+  const closestToPinMemberIds = new Set(selectedMemberIds);
+  const longDriveMemberIds = new Set(selectedMemberIds);
   elements.memberList.selectedMemberIds = selectedMemberIds;
   elements.memberList.teeOverrides = teeOverrides;
+  elements.memberList.skinsMemberIds = skinsMemberIds;
+  elements.memberList.pointsMemberIds = pointsMemberIds;
+  elements.memberList.closestToPinMemberIds = closestToPinMemberIds;
+  elements.memberList.longDriveMemberIds = longDriveMemberIds;
 
   function updateSelectedCount() {
     elements.selectedPlayerCount.textContent = `${selectedMemberIds.size} selected`;
   }
 
   function renderMemberRows() {
+    const selectedCourse = courses.find((course) => course.id === elements.courseSelect.value) || courses[0];
+    const teeOptions = selectedCourse.teeOrder.map((teeId) => {
+      const tee = selectedCourse.teeRatings[teeId];
+      return {
+        id: teeId,
+        label: tee.label
+      };
+    });
     const searchText = elements.memberSearch.value.trim().toLowerCase();
     const visibleMembers = members.filter((member) => {
       if (!member.active) return false;
@@ -41,16 +57,35 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
         <input type="checkbox" data-member-id="${member.id}"${selectedMemberIds.has(member.id) ? " checked" : ""}>
         <span>
           <strong>${member.name}</strong>
-          <span>${member.ghin ? `GHIN ${member.ghin}` : "No GHIN"} | Index ${member.handicap}</span>
+          <span>Playing today | ${member.ghin ? `GHIN ${member.ghin}` : "No GHIN"} | Index ${member.handicap}</span>
         </span>
       </label>
       <label class="tee-select-label">
         <span>Tees</span>
         <select class="field-control" data-tee-for="${member.id}">
-          <option value="white"${(teeOverrides.get(member.id) || member.tee) === "white" ? " selected" : ""}>White</option>
-          <option value="silver"${(teeOverrides.get(member.id) || member.tee) === "silver" ? " selected" : ""}>Silver</option>
+          ${teeOptions.map((tee) => `
+            <option value="${tee.id}"${(teeOverrides.get(member.id) || member.tee) === tee.id ? " selected" : ""}>${tee.label}</option>
+          `).join("")}
         </select>
       </label>
+      <div class="member-game-options">
+        <label class="game-toggle">
+          <input type="checkbox" data-skins-member-id="${member.id}"${skinsMemberIds.has(member.id) ? " checked" : ""}>
+          <span>In Skins</span>
+        </label>
+        <label class="game-toggle">
+          <input type="checkbox" data-points-member-id="${member.id}"${pointsMemberIds.has(member.id) ? " checked" : ""}>
+          <span>In Points Game</span>
+        </label>
+        <label class="game-toggle">
+          <input type="checkbox" data-closest-member-id="${member.id}"${closestToPinMemberIds.has(member.id) ? " checked" : ""}>
+          <span>In Closest to Pin</span>
+        </label>
+        <label class="game-toggle">
+          <input type="checkbox" data-long-drive-member-id="${member.id}"${longDriveMemberIds.has(member.id) ? " checked" : ""}>
+          <span>In Long Drive</span>
+        </label>
+      </div>
     `;
     elements.memberList.appendChild(row);
   });
@@ -59,19 +94,56 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
   renderMemberRows();
   updateSelectedCount();
 
+  elements.courseSelect.onchange = renderMemberRows;
   elements.memberSearch.oninput = renderMemberRows;
   elements.memberList.onchange = (event) => {
     const checkbox = event.target.closest("[data-member-id]");
     const teeSelect = event.target.closest("[data-tee-for]");
+    const skinsCheckbox = event.target.closest("[data-skins-member-id]");
+    const pointsCheckbox = event.target.closest("[data-points-member-id]");
+    const closestCheckbox = event.target.closest("[data-closest-member-id]");
+    const longDriveCheckbox = event.target.closest("[data-long-drive-member-id]");
 
     if (checkbox?.checked) {
       selectedMemberIds.add(checkbox.dataset.memberId);
+      skinsMemberIds.add(checkbox.dataset.memberId);
+      pointsMemberIds.add(checkbox.dataset.memberId);
+      closestToPinMemberIds.add(checkbox.dataset.memberId);
+      longDriveMemberIds.add(checkbox.dataset.memberId);
     } else if (checkbox) {
       selectedMemberIds.delete(checkbox.dataset.memberId);
+      skinsMemberIds.delete(checkbox.dataset.memberId);
+      pointsMemberIds.delete(checkbox.dataset.memberId);
+      closestToPinMemberIds.delete(checkbox.dataset.memberId);
+      longDriveMemberIds.delete(checkbox.dataset.memberId);
     }
 
     if (teeSelect) {
       teeOverrides.set(teeSelect.dataset.teeFor, teeSelect.value);
+    }
+
+    if (skinsCheckbox?.checked) {
+      skinsMemberIds.add(skinsCheckbox.dataset.skinsMemberId);
+    } else if (skinsCheckbox) {
+      skinsMemberIds.delete(skinsCheckbox.dataset.skinsMemberId);
+    }
+
+    if (pointsCheckbox?.checked) {
+      pointsMemberIds.add(pointsCheckbox.dataset.pointsMemberId);
+    } else if (pointsCheckbox) {
+      pointsMemberIds.delete(pointsCheckbox.dataset.pointsMemberId);
+    }
+
+    if (closestCheckbox?.checked) {
+      closestToPinMemberIds.add(closestCheckbox.dataset.closestMemberId);
+    } else if (closestCheckbox) {
+      closestToPinMemberIds.delete(closestCheckbox.dataset.closestMemberId);
+    }
+
+    if (longDriveCheckbox?.checked) {
+      longDriveMemberIds.add(longDriveCheckbox.dataset.longDriveMemberId);
+    } else if (longDriveCheckbox) {
+      longDriveMemberIds.delete(longDriveCheckbox.dataset.longDriveMemberId);
     }
 
     updateSelectedCount();
@@ -100,12 +172,20 @@ window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, cours
   const course = courses.find((item) => item.id === elements.courseSelect.value) || courses[0];
   const selectedMemberIds = elements.memberList.selectedMemberIds || new Set();
   const teeOverrides = elements.memberList.teeOverrides || new Map();
+  const skinsMemberIds = elements.memberList.skinsMemberIds || new Set();
+  const pointsMemberIds = elements.memberList.pointsMemberIds || new Set();
+  const closestToPinMemberIds = elements.memberList.closestToPinMemberIds || new Set();
+  const longDriveMemberIds = elements.memberList.longDriveMemberIds || new Set();
   const selectedPlayers = members
     .filter((member) => selectedMemberIds.has(member.id))
     .map((member) => {
       return {
         ...member,
-        tee: teeOverrides.get(member.id) || member.tee
+        tee: teeOverrides.get(member.id) || member.tee,
+        inSkins: skinsMemberIds.has(member.id),
+        inPoints: pointsMemberIds.has(member.id),
+        inClosestToPin: closestToPinMemberIds.has(member.id),
+        inLongDrive: longDriveMemberIds.has(member.id)
       };
     });
 
@@ -139,6 +219,13 @@ window.OGSGolf.ui.renderRoundSettingsSummary = function renderRoundSettingsSumma
   const gamesText = enabledGames.length
     ? enabledGames.map((game) => `${game.label}: $${game.amount}`).join(" | ")
     : "No games enabled";
+  const groupsText = roundSettings.groups
+    .map((group, index) => `Group ${index + 1}: ${group.length}`)
+    .join(" | ");
+  const skinsCount = roundSettings.players.filter((player) => player.inSkins).length;
+  const pointsCount = roundSettings.players.filter((player) => player.inPoints).length;
+  const closestCount = roundSettings.players.filter((player) => player.inClosestToPin).length;
+  const longDriveCount = roundSettings.players.filter((player) => player.inLongDrive).length;
 
   elements.roundSettingsSummary.innerHTML = `
     <div class="settings-card">
@@ -146,6 +233,8 @@ window.OGSGolf.ui.renderRoundSettingsSummary = function renderRoundSettingsSumma
         <strong>${roundSettings.course.name}</strong>
         <span>${roundSettings.players.length} players | ${roundSettings.groups.length} group${roundSettings.groups.length === 1 ? "" : "s"}</span>
       </div>
+      <div>${groupsText}</div>
+      <div>Skins: ${skinsCount} | Points: ${pointsCount} | CTP: ${closestCount} | Long Drive: ${longDriveCount}</div>
       <div>${gamesText}</div>
     </div>
   `;

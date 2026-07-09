@@ -5,6 +5,10 @@ window.OGSGolf.ui.renderPointsPayout = function renderPointsPayout(elements, rou
   const summary = roundState.getPointsSummary();
 
   function formatLeaders(result) {
+    if (!result.leaders.length) {
+      return "No players in Points Game";
+    }
+
     const names = result.leaders.map((leader) => leader.player.name).join(", ");
     return `${names} (${result.points} pts)`;
   }

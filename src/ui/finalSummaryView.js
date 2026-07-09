@@ -16,6 +16,16 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
   }
 
   function formatPointsWinner(result, label) {
+    if (!result.leaders.length) {
+      return `
+        <div class="summary-card">
+          <span>${label}</span>
+          <strong>No players</strong>
+          <small>Points Game</small>
+        </div>
+      `;
+    }
+
     const names = result.leaders.map((item) => item.player.name).join(", ");
     return `
       <div class="summary-card">
@@ -29,11 +39,12 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
   const skinsRows = summary.playerTotals
     .map((item) => {
       const holes = item.skins.holesWon.length ? item.skins.holesWon.join(", ") : "-";
+      const skinsText = roundState.isInSkins(item.player) ? `Holes ${holes}` : "Not in Skins";
       return `
         <div class="summary-row">
           <span>${item.player.name}</span>
-          <strong>${item.skins.totalSkins}</strong>
-          <small>Holes ${holes}</small>
+          <strong>${roundState.isInSkins(item.player) ? item.skins.totalSkins : "-"}</strong>
+          <small>${skinsText}</small>
         </div>
       `;
     })
@@ -43,7 +54,7 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
     .map((item) => `
       <div class="summary-row">
         <span>${item.player.name}</span>
-        <strong>${item.totals.points} pts</strong>
+        <strong>${roundState.isInPoints(item.player) ? `${item.totals.points} pts` : "Not in Points"}</strong>
         <small>Gross ${item.totals.gross} | Net ${item.totals.net}</small>
       </div>
     `)

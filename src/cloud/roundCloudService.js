@@ -2,6 +2,65 @@ window.OGSGolf = window.OGSGolf || {};
 window.OGSGolf.cloud = window.OGSGolf.cloud || {};
 
 window.OGSGolf.cloud.roundCloudService = {
+  async loadActiveRound() {
+    const config = window.OGSGolf.cloud.supabaseConfig;
+
+    if (!config.url || !config.anonKey) {
+      return { ok: false, round: null };
+    }
+
+    try {
+      const response = await fetch(
+        `${config.url}/rest/v1/rounds?select=raw_data&completed=eq.false&order=played_at.desc&limit=1`,
+        {
+          headers: {
+            apikey: config.anonKey,
+            Authorization: `Bearer ${config.anonKey}`
+          }
+        }
+      );
+
+      if (!response.ok) throw new Error("Active event request failed.");
+
+      const data = await response.json();
+      const rawData = data[0]?.raw_data;
+
+      return {
+        ok: true,
+        round: typeof rawData === "string" ? JSON.parse(rawData) : rawData || null
+      };
+    } catch (error) {
+      return { ok: false, round: null };
+    }
+  },
+
+  async saveActiveRound(roundData) {
+    const client = window.OGSGolf.cloud.getSupabaseClient();
+
+    if (!client) {
+      return { ok: false };
+    }
+
+    try {
+      await client.from("courses").upsert({
+        id: roundData.course.id,
+        name: roundData.course.name,
+        par: roundData.course.par
+      }).throwOnError();
+      await client.from("rounds").upsert({
+        id: roundData.id,
+        played_at: roundData.date || new Date().toISOString(),
+        course_id: roundData.course.id,
+        completed: false,
+        raw_data: roundData
+      }).throwOnError();
+
+      return { ok: true };
+    } catch (error) {
+      return { ok: false };
+    }
+  },
+
   async savePlayers(players) {
     const client = window.OGSGolf.cloud.getSupabaseClient();
 

@@ -11,16 +11,17 @@ window.OGSGolf.ui.renderSkinsSummary = function renderSkinsSummary(elements, pla
   playerSummary.className = "skins-list";
 
   players.forEach((player) => {
-    const summary = skinSummary[player.id];
+    const isInSkins = roundState.isInSkins(player);
+    const summary = skinSummary[player.id] || { totalSkins: 0, holesWon: [] };
     const holesText = summary.holesWon.length > 0 ? summary.holesWon.join(", ") : "-";
     const row = document.createElement("div");
     row.className = "skins-row";
     row.innerHTML = `
       <div>
         <div class="player-name">${player.name}</div>
-        <div class="player-details">Skin holes: ${holesText}</div>
+        <div class="player-details">${isInSkins ? `Skin holes: ${holesText}` : "Not in Skins"}</div>
       </div>
-      <strong>${summary.totalSkins}</strong>
+      <strong>${isInSkins ? summary.totalSkins : "-"}</strong>
     `;
     playerSummary.appendChild(row);
   });
@@ -34,12 +35,14 @@ window.OGSGolf.ui.renderSkinsSummary = function renderSkinsSummary(elements, pla
     savedSkins.forEach((skin) => {
       const winner = players.find((player) => player.id === skin.winnerId);
       const winnerText = winner ? winner.name : "No skin";
-      const netScores = skin.holeResults
-        .map((result) => {
-          const player = players.find((item) => item.id === result.playerId);
-          return `${player.name}: ${result.netScore}`;
-        })
-        .join(" | ");
+      const netScores = skin.holeResults.length
+        ? skin.holeResults
+            .map((result) => {
+              const player = players.find((item) => item.id === result.playerId);
+              return `${player.name}: ${result.netScore}`;
+            })
+            .join(" | ")
+        : "Waiting for skins players to finish this hole.";
       const row = document.createElement("div");
       row.className = "skins-hole";
       row.innerHTML = `

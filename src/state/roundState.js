@@ -28,6 +28,22 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     courseHandicaps[player.id] = getCourseHandicap(player, course);
   });
 
+  function isInSkins(player) {
+    return player.inSkins !== false;
+  }
+
+  function isInPoints(player) {
+    return player.inPoints !== false;
+  }
+
+  function getSkinsPlayers() {
+    return players.filter(isInSkins);
+  }
+
+  function getPointsPlayers() {
+    return players.filter(isInPoints);
+  }
+
   function getHoleForPlayer(player, holeIndex = currentHoleIndex) {
     return course.tees[player.tee][holeIndex];
   }
@@ -52,11 +68,13 @@ window.OGSGolf.state.createRoundState = function createRoundState(
           totals.gross += Number(score);
           totals.net += holeResult?.netScore ?? Number(score);
           totals.holesPlayed += 1;
-          totals.points += points;
-          if (index < 9) {
-            totals.frontPoints += points;
-          } else {
-            totals.backPoints += points;
+          if (isInPoints(player)) {
+            totals.points += points;
+            if (index < 9) {
+              totals.frontPoints += points;
+            } else {
+              totals.backPoints += points;
+            }
           }
         }
 
@@ -72,10 +90,17 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       back: "backPoints",
       overall: "points"
     }[section];
-    const totals = players.map((player) => ({
+    const pointsPlayers = getPointsPlayers();
+    const totals = pointsPlayers.map((player) => ({
       player,
       points: getPlayerTotals(player)[pointKey]
     }));
+    if (totals.length === 0) {
+      return {
+        points: 0,
+        leaders: []
+      };
+    }
     const highScore = Math.max(...totals.map((item) => item.points));
     const leaders = totals.filter((item) => item.points === highScore);
 
@@ -130,11 +155,11 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       const grossScore = savedScores[player.id][holeIndex];
       const par = getHoleForPlayer(player, holeIndex).par;
 
-      return {
-        player,
-        points: grossScore === null ? 0 : getPoints(grossScore, par)
-      };
-    });
+        return {
+          player,
+          points: grossScore === null || !isInPoints(player) ? 0 : getPoints(grossScore, par)
+        };
+      });
   }
 
   function getSkinForHole(holeIndex) {
@@ -147,15 +172,31 @@ window.OGSGolf.state.createRoundState = function createRoundState(
   }
 
   function recalculateSkins() {
+    const skinsPlayers = getSkinsPlayers();
+
     skinResults = savedHoleResults.map((holeResults, index) => {
       if (!holeResults) return null;
+      const skinHoleResults = holeResults.filter((result) =>
+        skinsPlayers.some((player) => player.id === result.playerId)
+      );
+      const hasEveryPlayer = skinsPlayers.length > 0 && skinsPlayers.every((player) =>
+        holeResults.some((result) => result.playerId === player.id)
+      );
 
-      const winnerId = getSkinWinner(holeResults);
+      if (!hasEveryPlayer) {
+        return {
+          hole: index + 1,
+          winnerId: null,
+          holeResults: skinHoleResults
+        };
+      }
+
+      const winnerId = getSkinWinner(skinHoleResults);
 
       return {
         hole: index + 1,
         winnerId,
-        holeResults
+        holeResults: skinHoleResults
       };
     });
   }
@@ -163,7 +204,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
   function getSkinSummary() {
     const summary = {};
 
-    players.forEach((player) => {
+    getSkinsPlayers().forEach((player) => {
       summary[player.id] = {
         player,
         totalSkins: 0,
@@ -173,6 +214,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
 
     skinResults.forEach((skin) => {
       if (!skin?.winnerId) return;
+      if (!summary[skin.winnerId]) return;
 
       summary[skin.winnerId].totalSkins += 1;
       summary[skin.winnerId].holesWon.push(skin.hole);
@@ -204,7 +246,11 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       playerTotals: players.map((player) => ({
         player,
         totals: getPlayerTotals(player),
-        skins: getSkinSummary()[player.id]
+        skins: getSkinSummary()[player.id] || {
+          player,
+          totalSkins: 0,
+          holesWon: []
+        }
       }))
     };
   }
@@ -227,7 +273,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
           gross: savedScores[player.id][holeIndex],
           strokesReceived: result?.strokesReceived ?? 0,
           net: result?.netScore ?? null,
-          points: savedScores[player.id][holeIndex] === null
+          points: savedScores[player.id][holeIndex] === null || !isInPoints(player)
             ? 0
             : getPoints(savedScores[player.id][holeIndex], hole.par)
         };
@@ -253,6 +299,10 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         ghin: player.ghin,
         handicapIndex: player.handicap,
         tee: player.tee,
+        inSkins: isInSkins(player),
+        inPoints: isInPoints(player),
+        inClosestToPin: player.inClosestToPin !== false,
+        inLongDrive: player.inLongDrive !== false,
         courseHandicap: courseHandicaps[player.id]
       })),
       holeByHole,
@@ -319,6 +369,10 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         handicap: player.handicap,
         handicapIndex: player.handicap,
         tee: player.tee,
+        inSkins: isInSkins(player),
+        inPoints: isInPoints(player),
+        inClosestToPin: player.inClosestToPin !== false,
+        inLongDrive: player.inLongDrive !== false,
         courseHandicap: courseHandicaps[player.id]
       })),
       savedScores,
@@ -376,6 +430,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     loadDraftScores();
   }
 
+  recalculateSkins();
   loadDraftScores();
 
   return {
@@ -400,6 +455,8 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     getLeaderboardStandings,
     getStrokesForPlayerOnHole,
     getSkinSummary,
+    isInSkins,
+    isInPoints,
     isRoundComplete,
     getLastSavedHoleIndex,
     getFinalSummary,
