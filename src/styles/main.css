@@ -103,6 +103,7 @@ main {
 
 .setup-section,
 .group-setup-section,
+.event-summary-section,
 .resume-section,
 .round-settings-section,
 .hole-section,
@@ -517,7 +518,8 @@ main {
 
 .player-form-actions,
 .player-management-actions,
-.group-setup-actions {
+.group-setup-actions,
+.event-summary-actions {
   display: grid;
   gap: 10px;
 }

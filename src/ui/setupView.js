@@ -4,6 +4,7 @@ window.OGSGolf.ui = window.OGSGolf.ui || {};
 window.OGSGolf.ui.gameOptions = [
   { id: "netSkins", label: "Net Skins", defaultEnabled: true, defaultAmount: 5 },
   { id: "pointsGame", label: "Points Game", defaultEnabled: true, defaultAmount: 5 },
+  { id: "teamChallenge", label: "Team Challenge", defaultEnabled: false, defaultAmount: 5 },
   { id: "closestToPin", label: "Closest to the Pin", defaultEnabled: false, defaultAmount: 2 },
   { id: "longDrive", label: "Long Drive", defaultEnabled: false, defaultAmount: 2 }
 ];
@@ -166,6 +167,19 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
     `;
     elements.gameList.appendChild(row);
   });
+
+  const skinsModeRow = document.createElement("div");
+  skinsModeRow.className = "game-row";
+  skinsModeRow.innerHTML = `
+    <label class="field-label" for="skinsHandicapMode">
+      Net Skins Handicap
+    </label>
+    <select id="skinsHandicapMode" class="field-control">
+      <option value="half" selected>Half Handicap Skins</option>
+      <option value="full">Full Handicap Skins</option>
+    </select>
+  `;
+  elements.gameList.appendChild(skinsModeRow);
 };
 
 window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, courses, members) {
@@ -197,7 +211,10 @@ window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, cours
     games[game.id] = {
       label: game.label,
       enabled: Boolean(enabledInput?.checked),
-      amount: Number(amountInput?.value || 0)
+      amount: Number(amountInput?.value || 0),
+      skinsHandicapMode: game.id === "netSkins"
+        ? elements.gameList.querySelector("#skinsHandicapMode")?.value || "half"
+        : undefined
     };
   });
 
@@ -226,6 +243,9 @@ window.OGSGolf.ui.renderRoundSettingsSummary = function renderRoundSettingsSumma
   const pointsCount = roundSettings.players.filter((player) => player.inPoints).length;
   const closestCount = roundSettings.players.filter((player) => player.inClosestToPin).length;
   const longDriveCount = roundSettings.players.filter((player) => player.inLongDrive).length;
+  const skinsMode = roundSettings.games.netSkins?.skinsHandicapMode === "full"
+    ? "Full Handicap Skins"
+    : "Half Handicap Skins";
 
   elements.roundSettingsSummary.innerHTML = `
     <div class="settings-card">
@@ -235,6 +255,7 @@ window.OGSGolf.ui.renderRoundSettingsSummary = function renderRoundSettingsSumma
       </div>
       <div>${groupsText}</div>
       <div>Skins: ${skinsCount} | Points: ${pointsCount} | CTP: ${closestCount} | Long Drive: ${longDriveCount}</div>
+      <div>${skinsMode}</div>
       <div>${gamesText}</div>
     </div>
   `;

@@ -111,9 +111,25 @@
 
       <div class="group-setup-actions">
         <button id="backToRoundSetup" type="button" class="secondary-button">Back to Round Setup</button>
-        <button id="beginGroupedRound" type="button" class="save-button">Start Round</button>
+        <button id="beginGroupedRound" type="button" class="save-button">Review Event Summary</button>
       </div>
       <div id="groupSetupStatus" class="cloud-save-status"></div>
+    </section>
+
+    <section id="eventSummaryScreen" class="event-summary-section is-hidden" aria-labelledby="eventSummaryTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">Event Summary</p>
+          <h2 id="eventSummaryTitle">Today's Event</h2>
+        </div>
+      </div>
+
+      <div id="eventSummary" class="event-summary"></div>
+
+      <div class="event-summary-actions">
+        <button id="backToGroupSetup" type="button" class="secondary-button">Back to Groups</button>
+        <button id="confirmStartRound" type="button" class="save-button">Start Round</button>
+      </div>
     </section>
 
     <div id="roundScreen" class="round-screen is-hidden">
@@ -294,6 +310,7 @@
   <script src="src/ui/previousRoundsView.js"></script>
   <script src="src/ui/playerManagementView.js"></script>
   <script src="src/ui/groupSetupView.js"></script>
+  <script src="src/ui/eventSummaryView.js"></script>
   <script src="src/app.js"></script>
 </body>
 </html>

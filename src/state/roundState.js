@@ -171,6 +171,12 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     return getStrokesOnHole(courseHandicaps[player.id], hole.handicap);
   }
 
+  function getSkinScore(grossScore, strokesReceived) {
+    const mode = roundSettings.games.netSkins?.skinsHandicapMode || "half";
+    const skinStrokeValue = mode === "half" ? 0.5 : 1;
+    return Number(grossScore) - (strokesReceived * skinStrokeValue);
+  }
+
   function recalculateSkins() {
     const skinsPlayers = getSkinsPlayers();
 
@@ -273,6 +279,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
           gross: savedScores[player.id][holeIndex],
           strokesReceived: result?.strokesReceived ?? 0,
           net: result?.netScore ?? null,
+          skinScore: result?.skinScore ?? null,
           points: savedScores[player.id][holeIndex] === null || !isInPoints(player)
             ? 0
             : getPoints(savedScores[player.id][holeIndex], hole.par)
@@ -400,13 +407,15 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       const grossScore = draftScores[player.id];
       const strokesReceived = getStrokesForPlayerOnHole(player);
       const netScore = getNetScore(grossScore, strokesReceived);
+      const skinScore = getSkinScore(grossScore, strokesReceived);
 
       savedScores[player.id][currentHoleIndex] = grossScore;
       holeResults.push({
         playerId: player.id,
         grossScore,
         strokesReceived,
-        netScore
+        netScore,
+        skinScore
       });
     });
 

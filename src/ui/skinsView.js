@@ -39,7 +39,8 @@ window.OGSGolf.ui.renderSkinsSummary = function renderSkinsSummary(elements, pla
         ? skin.holeResults
             .map((result) => {
               const player = players.find((item) => item.id === result.playerId);
-              return `${player.name}: ${result.netScore}`;
+              const skinScore = result.skinScore ?? result.netScore;
+              return `${player.name}: ${skinScore}`;
             })
             .join(" | ")
         : "Waiting for skins players to finish this hole.";

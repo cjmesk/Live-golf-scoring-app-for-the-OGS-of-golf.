@@ -10,6 +10,7 @@ const {
   readGroupScorers,
   readPlayerForm,
   renderFinalSummary,
+  renderEventSummary,
   renderGroupSetupView,
   renderHoleView,
   renderLeaderboard,
@@ -40,6 +41,7 @@ function setActiveScreen(screenName) {
   elements.scorerScreen.classList.toggle("is-hidden", screenName !== "scorer");
   elements.setupScreen.classList.toggle("is-hidden", screenName !== "setup");
   elements.groupSetupScreen.classList.toggle("is-hidden", screenName !== "groups");
+  elements.eventSummaryScreen.classList.toggle("is-hidden", screenName !== "eventSummary");
   elements.roundScreen.classList.toggle("is-hidden", screenName !== "round");
   elements.summaryScreen.classList.toggle("is-hidden", screenName !== "summary");
   elements.previousRoundsScreen.classList.toggle("is-hidden", screenName !== "previous");
@@ -515,7 +517,7 @@ function backToRoundSetup() {
   scrollToTop();
 }
 
-function beginGroupedRound() {
+function reviewEventSummary() {
   if (!pendingRoundSettings) return;
 
   roundSettings = {
@@ -523,6 +525,19 @@ function beginGroupedRound() {
     groups: readGroupAssignments(elements, pendingRoundSettings.players)
   };
   roundSettings.groupScorers = readGroupScorers(elements, roundSettings.groups);
+  renderEventSummary(elements, roundSettings);
+  setActiveScreen("eventSummary");
+  scrollToTop();
+}
+
+function backToGroupSetup() {
+  setActiveScreen("groups");
+  scrollToTop();
+}
+
+function beginGroupedRound() {
+  if (!roundSettings) return;
+
   selectedCourse = roundSettings.course;
   selectedPlayers = roundSettings.players;
   roundState = createRoundState(selectedCourse, selectedPlayers, roundSettings);
@@ -626,7 +641,9 @@ initializeApp();
 
 elements.startRound.addEventListener("click", continueToGroups);
 elements.backToRoundSetup.addEventListener("click", backToRoundSetup);
-elements.beginGroupedRound.addEventListener("click", beginGroupedRound);
+elements.beginGroupedRound.addEventListener("click", reviewEventSummary);
+elements.backToGroupSetup.addEventListener("click", backToGroupSetup);
+elements.confirmStartRound.addEventListener("click", beginGroupedRound);
 elements.resumeRound.addEventListener("click", resumeSavedRound);
 elements.startFreshRound.addEventListener("click", startFreshRound);
 elements.discardSavedRound.addEventListener("click", discardSavedRound);
