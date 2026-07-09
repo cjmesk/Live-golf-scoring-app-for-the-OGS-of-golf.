@@ -18,6 +18,7 @@
   <main>
     <div class="top-actions">
       <button id="showPreviousRounds" type="button" class="secondary-button">Previous Rounds</button>
+      <button id="showPlayerManagement" type="button" class="secondary-button">Player Management</button>
     </div>
 
     <section id="resumeScreen" class="resume-section is-hidden" aria-labelledby="resumeTitle">
@@ -144,9 +145,66 @@
         </div>
       </div>
 
-      <div id="previousRoundsList" class="previous-rounds-list"></div>
+      <div class="previous-round-actions">
+        <button id="refreshCloudRounds" type="button" class="save-button">Refresh Cloud Rounds</button>
+        <button id="backFromPreviousRounds" type="button" class="secondary-button">Back</button>
+      </div>
 
-      <button id="backFromPreviousRounds" type="button" class="secondary-button">Back</button>
+      <div id="previousRoundsStatus" class="cloud-save-status"></div>
+      <div id="previousRoundsList" class="previous-rounds-list"></div>
+    </section>
+
+    <section id="playerManagementScreen" class="player-management-section is-hidden" aria-labelledby="playerManagementTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">Roster</p>
+          <h2 id="playerManagementTitle">Player Management</h2>
+        </div>
+      </div>
+
+      <div class="setup-panel">
+        <div class="player-management-header">
+          <strong id="rosterCount">0 of 50 members</strong>
+          <span class="player-details">Add players here, then select today's players during Round Setup.</span>
+        </div>
+      </div>
+
+      <form id="playerForm" class="setup-panel">
+        <input id="editingPlayerId" type="hidden">
+
+        <label class="field-label" for="playerName">Player Name</label>
+        <input id="playerName" class="field-control" type="text" autocomplete="name" required>
+
+        <label class="field-label" for="playerGhin">GHIN</label>
+        <input id="playerGhin" class="field-control" type="text" inputmode="numeric">
+
+        <label class="field-label" for="playerHandicap">Handicap Index</label>
+        <input id="playerHandicap" class="field-control" type="number" step="0.1" required>
+
+        <label class="field-label" for="playerTee">Preferred Tee</label>
+        <select id="playerTee" class="field-control">
+          <option value="white">White</option>
+          <option value="silver">Silver</option>
+        </select>
+
+        <label class="game-toggle">
+          <input id="playerActive" type="checkbox" checked>
+          <span>Active member</span>
+        </label>
+
+        <div class="player-form-actions">
+          <button id="savePlayer" type="submit" class="save-button">Save Player</button>
+          <button id="clearPlayerForm" type="button" class="secondary-button">Clear Form</button>
+        </div>
+      </form>
+
+      <div class="player-management-actions">
+        <button id="saveRosterCloud" type="button" class="save-button">Save Roster to Supabase</button>
+        <button id="backFromPlayerManagement" type="button" class="secondary-button">Back</button>
+      </div>
+
+      <div id="playerManagementStatus" class="cloud-save-status"></div>
+      <div id="playerManagementList" class="member-list"></div>
     </section>
   </main>
 
@@ -155,6 +213,7 @@
   <script src="src/rules/points.js"></script>
   <script src="src/rules/handicap.js"></script>
   <script src="src/rules/skins.js"></script>
+  <script src="src/state/playerStorage.js"></script>
   <script src="src/state/roundState.js"></script>
   <script src="src/state/roundStorage.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -170,6 +229,7 @@
   <script src="src/ui/skinsView.js"></script>
   <script src="src/ui/finalSummaryView.js"></script>
   <script src="src/ui/previousRoundsView.js"></script>
+  <script src="src/ui/playerManagementView.js"></script>
   <script src="src/app.js"></script>
 </body>
 </html>

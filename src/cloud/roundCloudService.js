@@ -2,6 +2,89 @@ window.OGSGolf = window.OGSGolf || {};
 window.OGSGolf.cloud = window.OGSGolf.cloud || {};
 
 window.OGSGolf.cloud.roundCloudService = {
+  async savePlayers(players) {
+    const client = window.OGSGolf.cloud.getSupabaseClient();
+
+    if (!client) {
+      return {
+        ok: false,
+        reason: "not-configured",
+        message: "Player cloud save is not set up yet. Your roster is saved on this device."
+      };
+    }
+
+    const playerRows = players.map((player) => ({
+      id: player.id,
+      name: player.name,
+      ghin: player.ghin || null,
+      handicap_index: player.handicap,
+      preferred_tee: player.tee,
+      active: player.active
+    }));
+
+    try {
+      await client.from("players").upsert(playerRows).throwOnError();
+
+      return {
+        ok: true,
+        message: "Roster saved to Supabase ✓"
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: "failed",
+        message: "Cloud roster save failed. Your roster is still saved on this device."
+      };
+    }
+  },
+
+  async loadCompletedRounds() {
+    const config = window.OGSGolf.cloud.supabaseConfig;
+
+    if (!config.url || !config.anonKey) {
+      return {
+        ok: false,
+        reason: "not-configured",
+        message: "Cloud load failed, showing local rounds",
+        rounds: []
+      };
+    }
+
+    try {
+      const response = await fetch(
+        `${config.url}/rest/v1/rounds?select=id,played_at,raw_data&completed=eq.true&order=played_at.desc`,
+        {
+          headers: {
+            apikey: config.anonKey,
+            Authorization: `Bearer ${config.anonKey}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Cloud rounds request failed.");
+      }
+
+      const data = await response.json();
+      const rounds = (data || [])
+        .map((row) => (typeof row.raw_data === "string" ? JSON.parse(row.raw_data) : row.raw_data))
+        .filter(Boolean);
+
+      return {
+        ok: true,
+        message: "Loaded rounds from cloud",
+        rounds
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: "failed",
+        message: "Cloud load failed, showing local rounds",
+        rounds: []
+      };
+    }
+  },
+
   async saveCompletedRound(roundData) {
     const client = window.OGSGolf.cloud.getSupabaseClient();
 

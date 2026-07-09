@@ -1,12 +1,16 @@
-const { courses, players: members } = window.OGSGolf.data;
-const { createRoundState, roundStorage } = window.OGSGolf.state;
+const { courses, players: defaultPlayers, maxRosterSize } = window.OGSGolf.data;
+const { createRoundState, playerStorage, roundStorage } = window.OGSGolf.state;
 const { roundCloudService } = window.OGSGolf.cloud;
 const {
+  clearPlayerForm,
+  fillPlayerForm,
   getElements,
   readSetupSettings,
+  readPlayerForm,
   renderFinalSummary,
   renderHoleView,
   renderLeaderboard,
+  renderPlayerManagement,
   renderPointsPayout,
   renderPreviousRounds,
   renderRoundSettingsSummary,
@@ -15,6 +19,7 @@ const {
 } = window.OGSGolf.ui;
 
 const elements = getElements();
+let members = playerStorage.getAll(defaultPlayers);
 let selectedCourse = courses[0];
 let selectedPlayers = [];
 let roundSettings = null;
@@ -29,6 +34,7 @@ function setActiveScreen(screenName) {
   elements.roundScreen.classList.toggle("is-hidden", screenName !== "round");
   elements.summaryScreen.classList.toggle("is-hidden", screenName !== "summary");
   elements.previousRoundsScreen.classList.toggle("is-hidden", screenName !== "previous");
+  elements.playerManagementScreen.classList.toggle("is-hidden", screenName !== "players");
 }
 
 function scrollToTop() {
@@ -144,10 +150,50 @@ async function saveRoundToCloud() {
   elements.cloudSaveStatus.textContent = result.message;
 }
 
-function showPreviousRounds() {
+async function loadPreviousRoundsFromCloud() {
+  elements.previousRoundsStatus.textContent = "Loading cloud rounds...";
+
+  const result = await roundCloudService.loadCompletedRounds();
+
+  if (result.ok) {
+    renderPreviousRounds(elements, result.rounds);
+    elements.previousRoundsStatus.textContent = "Loaded rounds from cloud";
+    return;
+  }
+
   renderPreviousRounds(elements, roundStorage.getAll());
+  elements.previousRoundsStatus.textContent = "Cloud load failed, showing local rounds";
+}
+
+function showPreviousRounds() {
+  loadPreviousRoundsFromCloud();
   setActiveScreen("previous");
   scrollToTop();
+}
+
+function showPlayerManagement() {
+  renderPlayerManagement(elements, members, maxRosterSize);
+  elements.playerManagementStatus.textContent = "Roster changes are saved on this device first.";
+  setActiveScreen("players");
+  scrollToTop();
+}
+
+function returnFromPlayerManagement() {
+  renderSetupView(elements, courses, members);
+
+  if (roundState && roundState.isRoundComplete()) {
+    setActiveScreen("summary");
+    renderFinalSummary(elements, roundState);
+    return;
+  }
+
+  if (roundState) {
+    setActiveScreen("round");
+    renderApp();
+    return;
+  }
+
+  setActiveScreen("setup");
 }
 
 function returnFromPreviousRounds() {
@@ -164,6 +210,55 @@ function returnFromPreviousRounds() {
   }
 
   setActiveScreen("setup");
+}
+
+function getUniquePlayerId(playerId) {
+  let uniqueId = playerId || `player-${Date.now()}`;
+  let counter = 2;
+
+  while (members.some((player) => player.id === uniqueId)) {
+    uniqueId = `${playerId}-${counter}`;
+    counter += 1;
+  }
+
+  return uniqueId;
+}
+
+function savePlayer(event) {
+  event.preventDefault();
+
+  const formPlayer = readPlayerForm(elements);
+
+  if (!formPlayer) {
+    elements.playerManagementStatus.textContent = "Enter a name and handicap before saving.";
+    return;
+  }
+
+  const editingId = elements.editingPlayerId.value;
+
+  if (!editingId && members.length >= maxRosterSize) {
+    elements.playerManagementStatus.textContent = "The roster already has 50 members.";
+    return;
+  }
+
+  if (editingId) {
+    members = members.map((player) => (player.id === editingId ? formPlayer : player));
+  } else {
+    members = [...members, { ...formPlayer, id: getUniquePlayerId(formPlayer.id) }];
+  }
+
+  playerStorage.saveAll(members);
+  clearPlayerForm(elements);
+  renderPlayerManagement(elements, members, maxRosterSize);
+  elements.playerManagementStatus.textContent = "Player saved on this device.";
+}
+
+async function saveRosterToCloud() {
+  playerStorage.saveAll(members);
+  elements.playerManagementStatus.textContent = "Saving roster to Supabase...";
+
+  const result = await roundCloudService.savePlayers(members);
+  elements.playerManagementStatus.textContent = result.message;
 }
 
 function undoLastHole() {
@@ -315,4 +410,27 @@ elements.startNewRound.addEventListener("click", startNewRound);
 elements.saveRound.addEventListener("click", saveRound);
 elements.saveRoundCloud.addEventListener("click", saveRoundToCloud);
 elements.showPreviousRounds.addEventListener("click", showPreviousRounds);
+elements.refreshCloudRounds.addEventListener("click", loadPreviousRoundsFromCloud);
 elements.backFromPreviousRounds.addEventListener("click", returnFromPreviousRounds);
+elements.showPlayerManagement.addEventListener("click", showPlayerManagement);
+elements.playerForm.addEventListener("submit", savePlayer);
+elements.clearPlayerForm.addEventListener("click", () => {
+  clearPlayerForm(elements);
+  renderPlayerManagement(elements, members, maxRosterSize);
+});
+elements.saveRosterCloud.addEventListener("click", saveRosterToCloud);
+elements.backFromPlayerManagement.addEventListener("click", returnFromPlayerManagement);
+elements.playerManagementList.addEventListener("click", (event) => {
+  const editButton = event.target.closest("[data-edit-player]");
+
+  if (!editButton) return;
+
+  const player = members.find((member) => member.id === editButton.dataset.editPlayer);
+
+  if (!player) return;
+
+  fillPlayerForm(elements, player);
+  renderPlayerManagement(elements, members, maxRosterSize);
+  elements.playerManagementStatus.textContent = `Editing ${player.name}.`;
+  elements.playerForm.scrollIntoView({ behavior: "auto", block: "start" });
+});

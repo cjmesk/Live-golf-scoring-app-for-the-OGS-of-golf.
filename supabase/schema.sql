@@ -73,6 +73,8 @@ create policy "allow public read round_players" on round_players for select usin
 create policy "allow public read hole_scores" on hole_scores for select using (true);
 create policy "allow public read round_results" on round_results for select using (true);
 
+create policy "allow public insert players" on players for insert with check (true);
+create policy "allow public update players" on players for update using (true);
 create policy "allow public insert courses" on courses for insert with check (true);
 create policy "allow public update courses" on courses for update using (true);
 create policy "allow public insert rounds" on rounds for insert with check (true);

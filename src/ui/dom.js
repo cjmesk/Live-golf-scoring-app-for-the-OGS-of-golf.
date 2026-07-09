@@ -4,6 +4,7 @@ window.OGSGolf.ui = window.OGSGolf.ui || {};
 window.OGSGolf.ui.getElements = function getElements() {
   return {
     setupScreen: document.querySelector("#setupScreen"),
+    playerManagementScreen: document.querySelector("#playerManagementScreen"),
     resumeScreen: document.querySelector("#resumeScreen"),
     resumeCourseName: document.querySelector("#resumeCourseName"),
     resumeHoleStatus: document.querySelector("#resumeHoleStatus"),
@@ -13,7 +14,10 @@ window.OGSGolf.ui.getElements = function getElements() {
     roundScreen: document.querySelector("#roundScreen"),
     previousRoundsScreen: document.querySelector("#previousRoundsScreen"),
     previousRoundsList: document.querySelector("#previousRoundsList"),
+    previousRoundsStatus: document.querySelector("#previousRoundsStatus"),
     showPreviousRounds: document.querySelector("#showPreviousRounds"),
+    showPlayerManagement: document.querySelector("#showPlayerManagement"),
+    refreshCloudRounds: document.querySelector("#refreshCloudRounds"),
     backFromPreviousRounds: document.querySelector("#backFromPreviousRounds"),
     courseSelect: document.querySelector("#courseSelect"),
     memberSearch: document.querySelector("#memberSearch"),
@@ -42,6 +46,20 @@ window.OGSGolf.ui.getElements = function getElements() {
     undoLastHole: document.querySelector("#undoLastHole"),
     summaryUndoLastHole: document.querySelector("#summaryUndoLastHole"),
     saveHole: document.querySelector("#saveHole"),
-    resetScores: document.querySelector("#resetScores")
+    resetScores: document.querySelector("#resetScores"),
+    rosterCount: document.querySelector("#rosterCount"),
+    playerForm: document.querySelector("#playerForm"),
+    editingPlayerId: document.querySelector("#editingPlayerId"),
+    playerName: document.querySelector("#playerName"),
+    playerGhin: document.querySelector("#playerGhin"),
+    playerHandicap: document.querySelector("#playerHandicap"),
+    playerTee: document.querySelector("#playerTee"),
+    playerActive: document.querySelector("#playerActive"),
+    savePlayer: document.querySelector("#savePlayer"),
+    clearPlayerForm: document.querySelector("#clearPlayerForm"),
+    saveRosterCloud: document.querySelector("#saveRosterCloud"),
+    backFromPlayerManagement: document.querySelector("#backFromPlayerManagement"),
+    playerManagementStatus: document.querySelector("#playerManagementStatus"),
+    playerManagementList: document.querySelector("#playerManagementList")
   };
 };

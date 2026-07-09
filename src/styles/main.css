@@ -115,6 +115,7 @@ main {
 
 .top-actions {
   display: grid;
+  gap: 10px;
   margin-bottom: 12px;
 }
 
@@ -469,6 +470,28 @@ main {
 
 .summary-actions {
   margin-top: 12px;
+}
+
+.previous-round-actions {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.player-management-section {
+  margin-bottom: 16px;
+}
+
+.player-management-header,
+.player-management-row {
+  display: grid;
+  gap: 8px;
+}
+
+.player-form-actions,
+.player-management-actions {
+  display: grid;
+  gap: 10px;
 }
 
 .cloud-save-status {
