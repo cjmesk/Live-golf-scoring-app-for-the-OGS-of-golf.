@@ -52,6 +52,68 @@ function scrollToTop() {
   window.scrollTo({ top: 0, left: 0, behavior: "auto" });
 }
 
+function showRosterCloudStatus(message) {
+  if (!elements.rosterCloudStatus) return;
+
+  elements.rosterCloudStatus.textContent = message;
+  elements.rosterCloudStatus.classList.remove("is-hidden");
+}
+
+function mergeRoster(localPlayers, cloudPlayers) {
+  const mergedById = new Map();
+
+  localPlayers.forEach((player) => {
+    mergedById.set(player.id, player);
+  });
+
+  cloudPlayers.forEach((player) => {
+    mergedById.set(player.id, player);
+  });
+
+  return Array.from(mergedById.values()).sort((firstPlayer, secondPlayer) =>
+    firstPlayer.name.localeCompare(secondPlayer.name)
+  );
+}
+
+async function loadRosterFromCloud({ manual = false } = {}) {
+  if (manual && elements.playerManagementStatus) {
+    elements.playerManagementStatus.textContent = "Loading roster from Supabase...";
+  }
+
+  const result = await roundCloudService.loadPlayers();
+
+  if (result.ok && result.players.length > 0) {
+    members = mergeRoster(playerStorage.getAll(defaultPlayers), result.players);
+    playerStorage.saveAll(members);
+    renderSetupView(elements, courses, members);
+
+    if (!elements.playerManagementScreen.classList.contains("is-hidden")) {
+      renderPlayerManagement(elements, members, maxRosterSize);
+    }
+
+    if (manual && elements.playerManagementStatus) {
+      elements.playerManagementStatus.textContent = result.message;
+    }
+
+    showRosterCloudStatus(result.message);
+    return true;
+  }
+
+  const failureMessage = "Cloud roster failed, using default roster.";
+
+  if (!playerStorage.hasSavedRoster()) {
+    members = defaultPlayers;
+    renderSetupView(elements, courses, members);
+  }
+
+  if (manual && elements.playerManagementStatus) {
+    elements.playerManagementStatus.textContent = failureMessage;
+  }
+
+  showRosterCloudStatus(failureMessage);
+  return false;
+}
+
 function renderHoleStatus() {
   if (!roundState) return;
 
@@ -599,9 +661,10 @@ function resumeSavedRound() {
   scrollToTop();
 }
 
-renderSetupView(elements, courses, members);
-
 async function initializeApp() {
+  await loadRosterFromCloud();
+  renderSetupView(elements, courses, members);
+
   const localRound = roundStorage.getUnfinished();
   let activeRound = localRound;
 
@@ -760,6 +823,7 @@ elements.clearPlayerForm.addEventListener("click", () => {
   clearPlayerForm(elements);
   renderPlayerManagement(elements, members, maxRosterSize);
 });
+elements.loadRosterCloud.addEventListener("click", () => loadRosterFromCloud({ manual: true }));
 elements.saveRosterCloud.addEventListener("click", saveRosterToCloud);
 elements.backFromPlayerManagement.addEventListener("click", returnFromPlayerManagement);
 elements.playerManagementList.addEventListener("click", (event) => {

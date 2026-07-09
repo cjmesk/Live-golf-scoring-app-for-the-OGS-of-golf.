@@ -14,7 +14,7 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
     .map((course) => `<option value="${course.id}">${course.name}</option>`)
     .join("");
 
-  const selectedMemberIds = new Set(members.filter((member) => member.active).map((member) => member.id));
+  const selectedMemberIds = new Set();
   const teeOverrides = new Map();
   const skinsMemberIds = new Set(selectedMemberIds);
   const pointsMemberIds = new Set(selectedMemberIds);
@@ -51,11 +51,12 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
   elements.memberList.innerHTML = "";
 
   visibleMembers.forEach((member) => {
+    const isPlayingToday = selectedMemberIds.has(member.id);
     const row = document.createElement("div");
     row.className = "member-row";
     row.innerHTML = `
       <label class="member-check">
-        <input type="checkbox" data-member-id="${member.id}"${selectedMemberIds.has(member.id) ? " checked" : ""}>
+        <input type="checkbox" data-member-id="${member.id}"${isPlayingToday ? " checked" : ""}>
         <span>
           <strong>${member.name}</strong>
           <span>Playing today | ${member.ghin ? `GHIN ${member.ghin}` : "No GHIN"} | Index ${member.handicap}</span>
@@ -71,19 +72,19 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
       </label>
       <div class="member-game-options">
         <label class="game-toggle">
-          <input type="checkbox" data-skins-member-id="${member.id}"${skinsMemberIds.has(member.id) ? " checked" : ""}>
+          <input type="checkbox" data-skins-member-id="${member.id}"${skinsMemberIds.has(member.id) ? " checked" : ""}${isPlayingToday ? "" : " disabled"}>
           <span>In Skins</span>
         </label>
         <label class="game-toggle">
-          <input type="checkbox" data-points-member-id="${member.id}"${pointsMemberIds.has(member.id) ? " checked" : ""}>
+          <input type="checkbox" data-points-member-id="${member.id}"${pointsMemberIds.has(member.id) ? " checked" : ""}${isPlayingToday ? "" : " disabled"}>
           <span>In Points Game</span>
         </label>
         <label class="game-toggle">
-          <input type="checkbox" data-closest-member-id="${member.id}"${closestToPinMemberIds.has(member.id) ? " checked" : ""}>
+          <input type="checkbox" data-closest-member-id="${member.id}"${closestToPinMemberIds.has(member.id) ? " checked" : ""}${isPlayingToday ? "" : " disabled"}>
           <span>In Closest to Pin</span>
         </label>
         <label class="game-toggle">
-          <input type="checkbox" data-long-drive-member-id="${member.id}"${longDriveMemberIds.has(member.id) ? " checked" : ""}>
+          <input type="checkbox" data-long-drive-member-id="${member.id}"${longDriveMemberIds.has(member.id) ? " checked" : ""}${isPlayingToday ? "" : " disabled"}>
           <span>In Long Drive</span>
         </label>
       </div>
@@ -117,6 +118,12 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
       pointsMemberIds.delete(checkbox.dataset.memberId);
       closestToPinMemberIds.delete(checkbox.dataset.memberId);
       longDriveMemberIds.delete(checkbox.dataset.memberId);
+    }
+
+    if (checkbox) {
+      updateSelectedCount();
+      renderMemberRows();
+      return;
     }
 
     if (teeSelect) {

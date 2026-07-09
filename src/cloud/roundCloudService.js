@@ -281,3 +281,56 @@ window.OGSGolf.cloud.roundCloudService.savePlayers = async function savePlayers(
     };
   }
 };
+
+window.OGSGolf.cloud.roundCloudService.loadPlayers = async function loadPlayers() {
+  const config = window.OGSGolf.cloud.supabaseConfig;
+
+  if (!config.url || !config.anonKey) {
+    return {
+      ok: false,
+      reason: "not-configured",
+      players: [],
+      message: "Cloud roster failed, using default roster."
+    };
+  }
+
+  try {
+    const response = await fetch(
+      `${config.url}/rest/v1/players?select=id,name,ghin,handicap_index,preferred_tee,active&order=name.asc`,
+      {
+        method: "GET",
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Player roster load failed.");
+    }
+
+    const rows = await response.json();
+    const players = rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      ghin: row.ghin || "",
+      handicap: Number(row.handicap_index ?? 0),
+      tee: row.preferred_tee || "white",
+      active: row.active !== false
+    }));
+
+    return {
+      ok: true,
+      players,
+      message: "Roster loaded from Supabase."
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "failed",
+      players: [],
+      message: "Cloud roster failed, using default roster."
+    };
+  }
+};

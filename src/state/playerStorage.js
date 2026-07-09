@@ -9,6 +9,10 @@ window.OGSGolf.state.playerStorage = {
     return savedPlayers || defaultPlayers;
   },
 
+  hasSavedRoster() {
+    return Boolean(window.localStorage.getItem(this.key));
+  },
+
   saveAll(players) {
     window.localStorage.setItem(this.key, JSON.stringify(players));
     return players;

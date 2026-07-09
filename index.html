@@ -20,6 +20,7 @@
       <button id="showPreviousRounds" type="button" class="secondary-button">Previous Rounds</button>
       <button id="showPlayerManagement" type="button" class="secondary-button">Player Management</button>
     </div>
+    <div id="rosterCloudStatus" class="cloud-save-status is-hidden"></div>
 
     <section id="resumeScreen" class="resume-section is-hidden" aria-labelledby="resumeTitle">
       <div class="setup-header">
@@ -277,6 +278,7 @@
       </form>
 
       <div class="player-management-actions">
+        <button id="loadRosterCloud" type="button" class="secondary-button">Load Roster from Supabase</button>
         <button id="saveRosterCloud" type="button" class="save-button">Save Roster to Supabase</button>
         <button id="backFromPlayerManagement" type="button" class="secondary-button">Back</button>
       </div>
