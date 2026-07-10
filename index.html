@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OG&apos;s Golf</title>
-  <link rel="stylesheet" href="src/styles/main.css?v=20260709-score-scroll">
+  <link rel="stylesheet" href="src/styles/main.css?v=20260710-today-round">
 </head>
 <body>
   <header class="app-header">
@@ -41,6 +41,40 @@
     </div>
     <div id="modeStatus" class="cloud-save-status"></div>
     <div id="rosterCloudStatus" class="cloud-save-status is-hidden"></div>
+
+    <section id="todayScreen" class="today-section is-hidden" aria-labelledby="todayTitle">
+      <div class="setup-header today-header">
+        <div>
+          <p class="eyebrow dark">Today's Round</p>
+          <h2 id="todayTitle">OGS Golf</h2>
+        </div>
+      </div>
+
+      <div class="setup-panel today-card">
+        <div class="today-row">
+          <span>Date</span>
+          <strong id="todayDate">Today</strong>
+        </div>
+        <div class="today-row">
+          <span>Course</span>
+          <strong id="todayCourseName">Twelve Stones Golf Club</strong>
+        </div>
+        <div class="today-row">
+          <span>Event Status</span>
+          <strong id="todayEventStatus">Open</strong>
+        </div>
+        <div class="today-row">
+          <span>Players</span>
+          <strong id="todayPlayerCount">0</strong>
+        </div>
+        <div class="today-row">
+          <span>Start Time</span>
+          <strong id="todayStartTime">Not set</strong>
+        </div>
+      </div>
+
+      <button id="continueToRound" type="button" class="save-button start-button">Continue to Round</button>
+    </section>
 
     <section id="resumeScreen" class="resume-section is-hidden" aria-labelledby="resumeTitle">
       <div class="setup-header">
@@ -191,7 +225,7 @@
         <h2 id="roundSettingsTitle">Round Settings</h2>
         <div id="roundSettingsSummary" class="round-settings-summary"></div>
         <div class="scorer-actions">
-          <button id="changeScorer" type="button" class="secondary-button">Not you? Change scorer</button>
+          <button id="changeScorer" type="button" class="secondary-button">Change Player</button>
           <button id="viewOverallLeaderboard" type="button" class="secondary-button">View Overall Leaderboard</button>
         </div>
       </section>
@@ -374,7 +408,7 @@
   <script src="src/cloud/supabaseConfig.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/supabaseClient.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/roundCloudService.js?v=20260709-v098-menu"></script>
-  <script src="src/ui/dom.js?v=20260709-v098-menu"></script>
+  <script src="src/ui/dom.js?v=20260710-today-round"></script>
   <script src="src/ui/formatters.js?v=20260710-index-course-handicap"></script>
   <script src="src/ui/setupView.js?v=20260709-v098-menu"></script>
   <script src="src/ui/holeView.js?v=20260710-index-course-handicap"></script>
@@ -386,6 +420,6 @@
   <script src="src/ui/playerManagementView.js?v=20260709-v098-menu"></script>
   <script src="src/ui/groupSetupView.js?v=20260709-v098-menu"></script>
   <script src="src/ui/eventSummaryView.js?v=20260709-v098-menu"></script>
-  <script src="src/app.js?v=20260709-confirm-final"></script>
+  <script src="src/app.js?v=20260710-today-round"></script>
 </body>
 </html>

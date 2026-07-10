@@ -39,6 +39,7 @@ let commissionerMode = scorerStorage.isCommissioner();
 function setActiveScreen(screenName) {
   const isScoringScreen = screenName === "round";
 
+  elements.todayScreen.classList.toggle("is-hidden", screenName !== "today");
   elements.resumeScreen.classList.toggle("is-hidden", screenName !== "resume");
   elements.scorerScreen.classList.toggle("is-hidden", screenName !== "scorer");
   elements.setupScreen.classList.toggle("is-hidden", screenName !== "setup");
@@ -68,6 +69,33 @@ function scrollToScoring() {
 
 function getCurrentScorerName() {
   return members.find((member) => member.id === currentScorerId)?.name || "Scorer";
+}
+
+function formatTodayDate() {
+  return new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function renderTodayRoundScreen() {
+  const eventCourseName = roundSettings?.course?.name || selectedCourse?.name || "Twelve Stones Golf Club";
+  const playerCount = selectedPlayers.length || roundSettings?.players?.length || 0;
+  const startTime = roundSettings?.startTime || roundSettings?.teeTime || "Not set";
+
+  elements.todayDate.textContent = formatTodayDate();
+  elements.todayCourseName.textContent = eventCourseName;
+  elements.todayEventStatus.textContent = "Open";
+  elements.todayPlayerCount.textContent = String(playerCount);
+  elements.todayStartTime.textContent = startTime;
+}
+
+function showTodayRoundScreen() {
+  renderTodayRoundScreen();
+  setActiveScreen("today");
+  scrollToTop();
 }
 
 function renderAccessMode() {
@@ -449,7 +477,9 @@ function getAssignedGroupIndex(playerId) {
 }
 
 function renderScorerSelection() {
-  const activePlayers = members.filter((member) => member.active);
+  const activePlayers = selectedPlayers.length
+    ? selectedPlayers
+    : members.filter((member) => member.active);
   elements.scorerList.innerHTML = activePlayers
     .map((player) => `
       <button type="button" class="secondary-button" data-scorer-id="${player.id}">
@@ -460,6 +490,46 @@ function renderScorerSelection() {
   elements.scorerAccessStatus.textContent = "";
   setActiveScreen("scorer");
   scrollToTop();
+}
+
+function continueFromTodayRound() {
+  if (roundState) {
+    if (commissionerMode) {
+      setActiveScreen("round");
+      renderApp();
+      scrollToScoring();
+      return;
+    }
+
+    if (currentScorerId) {
+      if (roundSettings.groupScorers && !roundSettings.groupScorers.includes(currentScorerId)) {
+        scorerStorage.clearScorerId();
+        currentScorerId = null;
+        renderScorerSelection();
+        elements.scorerAccessStatus.textContent = "Choose the scorer assigned to this group.";
+        return;
+      }
+
+      currentGroupIndex = getAssignedGroupIndex(currentScorerId);
+      syncRoundStateToCurrentGroup();
+      setActiveScreen("round");
+      renderApp();
+      scrollToScoring();
+      return;
+    }
+
+    renderScorerSelection();
+    return;
+  }
+
+  if (commissionerMode) {
+    setActiveScreen("setup");
+    scrollToTop();
+    return;
+  }
+
+  renderScorerSelection();
+  elements.scorerAccessStatus.textContent = "No active event found yet. Ask the commissioner to create one.";
 }
 
 function enterScorer(playerId) {
@@ -910,35 +980,11 @@ async function initializeApp() {
 
   if (activeRound) {
     loadSavedRoundIntoState(activeRound);
-
-    if (commissionerMode) {
-      showResumePrompt(activeRound);
-      return;
-    }
-
-    if (currentScorerId) {
-      setActiveScreen("round");
-      renderApp();
-      scrollToScoring();
-      return;
-    }
-
-    renderScorerSelection();
+    showTodayRoundScreen();
     return;
   }
 
-  if (currentScorerId && !commissionerMode) {
-    renderScorerSelection();
-    elements.scorerAccessStatus.textContent = "No active event found yet. Ask the commissioner to create one.";
-    return;
-  }
-
-  if (commissionerMode) {
-    setActiveScreen("setup");
-    return;
-  }
-
-  renderScorerSelection();
+  showTodayRoundScreen();
 }
 
 initializeApp();
@@ -979,6 +1025,7 @@ elements.confirmStartRound.addEventListener("click", beginGroupedRound);
 elements.resumeRound.addEventListener("click", resumeSavedRound);
 elements.startFreshRound.addEventListener("click", () => startFreshRound({ clearSavedRound: true }));
 elements.discardSavedRound.addEventListener("click", discardSavedRound);
+elements.continueToRound.addEventListener("click", continueFromTodayRound);
 elements.scorerList.addEventListener("click", (event) => {
   const scorerButton = event.target.closest("[data-scorer-id]");
 
