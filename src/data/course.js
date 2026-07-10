@@ -25,6 +25,7 @@ function getTotalYardage(yardages) {
 function buildTeeSummary(label, yardages, courseRating, slopeRating, status = "verified") {
   return {
     label,
+    par: twelveStonesParByHole.reduce((total, par) => total + par, 0),
     totalYardage: getTotalYardage(yardages),
     courseRating,
     slopeRating,

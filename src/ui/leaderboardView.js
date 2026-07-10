@@ -6,11 +6,16 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
   const standings = players
     .map((player) => ({
       player,
-      totals: roundState.getPlayerTotals(player)
+      totals: roundState.getPlayerTotals(player),
+      pointsResult: roundState.getPointsDifferential(player, "overall")
     }))
     .sort((a, b) => {
       if (pointsEnabled && roundState.isInPoints(a.player) !== roundState.isInPoints(b.player)) {
         return roundState.isInPoints(a.player) ? -1 : 1;
+      }
+
+      if (pointsEnabled && b.pointsResult.differential !== a.pointsResult.differential) {
+        return b.pointsResult.differential - a.pointsResult.differential;
       }
 
       if (pointsEnabled && b.totals.points !== a.totals.points) {
@@ -24,6 +29,9 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
 
   standings.forEach((standing, index) => {
     const { player, totals } = standing;
+    const frontPointsResult = roundState.getPointsDifferential(player, "front");
+    const backPointsResult = roundState.getPointsDifferential(player, "back");
+    const overallPointsResult = standing.pointsResult;
     const gameStatus = [
       roundState.isInSkins(player) ? "Skins" : "Not in Skins",
       roundState.isInPoints(player) ? "Points" : "Not in Points",
@@ -36,13 +44,16 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
       <div class="rank">${index + 1}</div>
       <div>
         <div class="player-name">${player.name}</div>
-        <div class="player-details">${player.tee} tees | ${totals.holesPlayed}/18 holes saved</div>
+        <div class="player-details">Index ${player.handicap} | Course Handicap ${roundState.courseHandicaps[player.id]} | ${player.tee} tees</div>
+        <div class="player-details">${totals.holesPlayed}/18 holes saved</div>
         <div class="player-details">${gameStatus}</div>
       </div>
       <div class="leaderboard-totals">
-        ${pointsEnabled && roundState.isInPoints(player) ? `<span class="points">${totals.points} pts</span>` : ""}
+        ${pointsEnabled && roundState.isInPoints(player) ? `<span class="points">${overallPointsResult.display}</span>` : ""}
         ${pointsEnabled && !roundState.isInPoints(player) ? `<span class="gross">Not in Points</span>` : ""}
-        ${pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">F9 ${totals.frontPoints} | B9 ${totals.backPoints}</span>` : ""}
+        ${pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">Quota ${frontPointsResult.quota} per side / ${overallPointsResult.target} overall</span>` : ""}
+        ${pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">${totals.points} pts earned</span>` : ""}
+        ${pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">Front ${frontPointsResult.display} | Back ${backPointsResult.display}</span>` : ""}
         <span class="gross">Gross ${totals.gross || "-"}</span>
         <span class="gross">Net ${totals.net || "-"}</span>
       </div>

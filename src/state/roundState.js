@@ -44,6 +44,20 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     return players.filter(isInPoints);
   }
 
+  function formatPointsNumber(value) {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  }
+
+  function formatPointsResult(value) {
+    if (value === 0) return "E";
+    return value > 0 ? `+${formatPointsNumber(value)}` : formatPointsNumber(value);
+  }
+
+  function getPointsQuota(player) {
+    const playingHandicap = courseHandicaps[player.id] ?? getCourseHandicap(player, course);
+    return Math.ceil((36 - (playingHandicap * 2)) * 2) / 2;
+  }
+
   function getHoleForPlayer(player, holeIndex = currentHoleIndex) {
     return course.tees[player.tee][holeIndex];
   }
@@ -65,47 +79,98 @@ window.OGSGolf.state.createRoundState = function createRoundState(
           const holeResult = savedHoleResults[index]?.find(
             (result) => result.playerId === player.id
           );
+          const strokesReceived = getStrokesForPlayerOnHole(player, index);
+          const netScore = holeResult?.netScore ?? getNetScore(score, strokesReceived);
           totals.gross += Number(score);
-          totals.net += holeResult?.netScore ?? Number(score);
+          totals.net += Number(netScore);
           totals.holesPlayed += 1;
           if (isInPoints(player)) {
             totals.points += points;
             if (index < 9) {
               totals.frontPoints += points;
+              totals.frontHolesPlayed += 1;
             } else {
               totals.backPoints += points;
+              totals.backHolesPlayed += 1;
             }
           }
         }
 
         return totals;
       },
-      { gross: 0, net: 0, points: 0, frontPoints: 0, backPoints: 0, holesPlayed: 0 }
+      {
+        gross: 0,
+        net: 0,
+        points: 0,
+        frontPoints: 0,
+        backPoints: 0,
+        frontHolesPlayed: 0,
+        backHolesPlayed: 0,
+        holesPlayed: 0,
+        pointsQuota: getPointsQuota(player),
+        frontPointsTarget: getPointsQuota(player),
+        backPointsTarget: getPointsQuota(player),
+        overallPointsTarget: getPointsQuota(player) * 2
+      }
     );
   }
 
-  function getPointsLeaders(section) {
-    const pointKey = {
-      front: "frontPoints",
-      back: "backPoints",
-      overall: "points"
+  function getPointsDifferential(player, section = "overall") {
+    const totals = getPlayerTotals(player);
+    const target = {
+      front: totals.frontPointsTarget,
+      back: totals.backPointsTarget,
+      overall: totals.overallPointsTarget
     }[section];
+    const points = {
+      front: totals.frontPoints,
+      back: totals.backPoints,
+      overall: totals.points
+    }[section];
+    const holesPlayed = {
+      front: totals.frontHolesPlayed,
+      back: totals.backHolesPlayed,
+      overall: totals.holesPlayed
+    }[section];
+    const holesNeeded = section === "overall" ? 18 : 9;
+    const isComplete = holesPlayed >= holesNeeded;
+    const differential = points - target;
+
+    return {
+      points,
+      target,
+      quota: totals.pointsQuota,
+      holesPlayed,
+      holesNeeded,
+      isComplete,
+      differential,
+      display: isComplete ? formatPointsResult(differential) : `${points} pts thru ${holesPlayed}`
+    };
+  }
+
+  function getPointsLeaders(section) {
     const pointsPlayers = getPointsPlayers();
     const totals = pointsPlayers.map((player) => ({
       player,
-      points: getPlayerTotals(player)[pointKey]
+      ...getPointsDifferential(player, section)
     }));
     if (totals.length === 0) {
       return {
         points: 0,
+        target: 0,
+        differential: null,
+        display: "-",
         leaders: []
       };
     }
-    const highScore = Math.max(...totals.map((item) => item.points));
-    const leaders = totals.filter((item) => item.points === highScore);
+    const highDifferential = Math.max(...totals.map((item) => item.differential));
+    const leaders = totals.filter((item) => item.differential === highDifferential);
 
     return {
-      points: highScore,
+      points: leaders[0].points,
+      target: leaders[0].target,
+      differential: highDifferential,
+      display: formatPointsResult(highDifferential),
       leaders
     };
   }
@@ -125,6 +190,13 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         totals: getPlayerTotals(player)
       }))
       .sort((a, b) => {
+        const aPointsResult = getPointsDifferential(a.player, "overall");
+        const bPointsResult = getPointsDifferential(b.player, "overall");
+
+        if (bPointsResult.differential !== aPointsResult.differential) {
+          return bPointsResult.differential - aPointsResult.differential;
+        }
+
         if (b.totals.points !== a.totals.points) {
           return b.totals.points - a.totals.points;
         }
@@ -370,6 +442,15 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         points: item.totals.points,
         frontPoints: item.totals.frontPoints,
         backPoints: item.totals.backPoints,
+        frontHolesPlayed: item.totals.frontHolesPlayed,
+        backHolesPlayed: item.totals.backHolesPlayed,
+        pointsQuota: item.totals.pointsQuota,
+        frontPointsTarget: item.totals.frontPointsTarget,
+        backPointsTarget: item.totals.backPointsTarget,
+        overallPointsTarget: item.totals.overallPointsTarget,
+        frontPointsResult: getPointsDifferential(item.player, "front").display,
+        backPointsResult: getPointsDifferential(item.player, "back").display,
+        overallPointsResult: getPointsDifferential(item.player, "overall").display,
         skinsWon: item.skins.totalSkins,
         skinHoles: item.skins.holesWon
       })),
@@ -398,7 +479,16 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         points: playerTotals.points,
         frontPoints: playerTotals.frontPoints,
         backPoints: playerTotals.backPoints,
-        overallPoints: playerTotals.points
+        frontHolesPlayed: playerTotals.frontHolesPlayed,
+        backHolesPlayed: playerTotals.backHolesPlayed,
+        overallPoints: playerTotals.points,
+        pointsQuota: playerTotals.pointsQuota,
+        frontPointsTarget: playerTotals.frontPointsTarget,
+        backPointsTarget: playerTotals.backPointsTarget,
+        overallPointsTarget: playerTotals.overallPointsTarget,
+        frontPointsResult: getPointsDifferential(player, "front").display,
+        backPointsResult: getPointsDifferential(player, "back").display,
+        overallPointsResult: getPointsDifferential(player, "overall").display
       };
     });
 
@@ -535,6 +625,8 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     getHolePointsResults,
     getSkinForHole,
     getPlayerTotals,
+    getPointsQuota,
+    getPointsDifferential,
     getPointsSummary,
     getLeaderboardStandings,
     getStrokesForPlayerOnHole,

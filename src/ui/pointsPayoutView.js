@@ -10,7 +10,7 @@ window.OGSGolf.ui.renderPointsPayout = function renderPointsPayout(elements, rou
     }
 
     const names = result.leaders.map((leader) => leader.player.name).join(", ");
-    return `${names} (${result.points} pts)`;
+    return `${names} (${result.display})`;
   }
 
   elements.pointsPayout.innerHTML = `

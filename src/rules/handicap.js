@@ -3,13 +3,14 @@ window.OGSGolf.rules = window.OGSGolf.rules || {};
 
 window.OGSGolf.rules.getCourseHandicap = function getCourseHandicap(player, course) {
   const teeRating = course.teeRatings[player.tee];
+  const teePar = teeRating.par || course.par;
 
   // Course Handicap turns a player's Handicap Index into the number of strokes
   // they receive from a specific tee. Slope adjusts for difficulty compared with
   // an average course. Course Rating minus par adjusts when the tee plays easier
   // or harder than par.
   return Math.round(
-    player.handicap * (teeRating.slopeRating / 113) + (teeRating.courseRating - course.par)
+    player.handicap * (teeRating.slopeRating / 113) + (teeRating.courseRating - teePar)
   );
 };
 

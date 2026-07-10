@@ -31,7 +31,7 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
       <div class="summary-card">
         <span>${label}</span>
         <strong>${names}</strong>
-        <small>${result.points} pts</small>
+        <small>${result.display} (${result.points} pts / ${result.target})</small>
       </div>
     `;
   }
@@ -54,8 +54,8 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
     .map((item) => `
       <div class="summary-row">
         <span>${item.player.name}</span>
-        <strong>${roundState.isInPoints(item.player) ? `${item.totals.points} pts` : "Not in Points"}</strong>
-        <small>Gross ${item.totals.gross} | Net ${item.totals.net}</small>
+        <strong>${roundState.isInPoints(item.player) ? `${roundState.getPointsDifferential(item.player, "overall").display}` : "Not in Points"}</strong>
+        <small>Pts ${item.totals.points}/${item.totals.overallPointsTarget} | Gross ${item.totals.gross} | Net ${item.totals.net}</small>
       </div>
     `)
     .join("");
