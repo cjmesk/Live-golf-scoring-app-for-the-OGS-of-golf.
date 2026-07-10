@@ -35,6 +35,7 @@ let currentGroupIndex = 0;
 let groupHoleIndexes = [];
 let currentScorerId = scorerStorage.getScorerId();
 let commissionerMode = scorerStorage.isCommissioner();
+let viewOnlyMode = false;
 
 function setActiveScreen(screenName) {
   const isScoringScreen = screenName === "round";
@@ -55,7 +56,7 @@ function setActiveScreen(screenName) {
   elements.aboutScreen.classList.toggle("is-hidden", screenName !== "about");
   document.body.classList.toggle("is-scoring", isScoringScreen);
   elements.modeStatus.classList.toggle("is-hidden", isScoringScreen);
-  elements.rosterCloudStatus.classList.toggle("is-hidden", isScoringScreen);
+  elements.rosterCloudStatus.classList.toggle("is-hidden", isScoringScreen || screenName === "today");
   renderAccessMode();
 }
 
@@ -83,13 +84,23 @@ function formatTodayDate() {
 function renderTodayRoundScreen() {
   const eventCourseName = roundSettings?.course?.name || selectedCourse?.name || "Twelve Stones Golf Club";
   const playerCount = selectedPlayers.length || roundSettings?.players?.length || 0;
+  const groupCount = roundSettings?.groups?.length || 0;
   const startTime = roundSettings?.startTime || roundSettings?.teeTime || "Not set";
+  const hasActiveRound = Boolean(roundState);
 
   elements.todayDate.textContent = formatTodayDate();
   elements.todayCourseName.textContent = eventCourseName;
-  elements.todayEventStatus.textContent = roundSettings?.eventStatus || "Open";
+  elements.todayEventStatus.textContent = hasActiveRound
+    ? roundSettings?.eventStatus || "Open"
+    : "No active round yet";
   elements.todayPlayerCount.textContent = String(playerCount);
   elements.todayStartTime.textContent = startTime;
+  elements.todayGroupCount.textContent = String(groupCount);
+  elements.viewLiveMatch.disabled = !hasActiveRound;
+  elements.choosePlayerScoring.disabled = !hasActiveRound;
+  elements.todayStatus.textContent = hasActiveRound
+    ? "Today's match is ready."
+    : "No active round yet.";
 }
 
 function showTodayRoundScreen() {
@@ -114,6 +125,12 @@ function renderAccessMode() {
   if (commissionerMode) {
     elements.modeStatus.textContent = "Commissioner View: event setup, player management, reset, and all groups are unlocked.";
     elements.showPlayerManagement.disabled = false;
+    return;
+  }
+
+  if (viewOnlyMode) {
+    elements.modeStatus.textContent = "Viewing live match. Score entry is locked.";
+    elements.showPlayerManagement.disabled = true;
     return;
   }
 
@@ -321,7 +338,11 @@ function showRosterCloudStatus(message) {
   if (!elements.rosterCloudStatus) return;
 
   elements.rosterCloudStatus.textContent = message;
-  elements.rosterCloudStatus.classList.remove("is-hidden");
+
+  const shouldShowRosterStatus = commissionerMode
+    || !elements.setupScreen.classList.contains("is-hidden")
+    || !elements.playerManagementScreen.classList.contains("is-hidden");
+  elements.rosterCloudStatus.classList.toggle("is-hidden", !shouldShowRosterStatus);
 }
 
 function mergeRoster(localPlayers, cloudPlayers) {
@@ -383,10 +404,12 @@ function renderHoleStatus() {
   if (!roundState) return;
 
   const visibleGroups = commissionerMode
+    || viewOnlyMode
     ? roundSettings.groups.map((group, index) => ({ group, index }))
     : roundSettings.groups
         .map((group, index) => ({ group, index }))
         .filter((item) => roundSettings.groupScorers?.[item.index] === currentScorerId);
+  const canEdit = canEditCurrentGroup();
 
   elements.currentHoleStatus.textContent =
     isGroupComplete(currentGroupIndex)
@@ -401,11 +424,16 @@ function renderHoleStatus() {
       return `<option value="${index}"${index === currentGroupIndex ? " selected" : ""}>Group ${index + 1} - ${completeText} - ${group.length} players</option>`;
     })
     .join("");
-  elements.previousGroup.disabled = !commissionerMode || currentGroupIndex === 0;
-  elements.nextGroup.disabled = !commissionerMode || currentGroupIndex === roundSettings.groups.length - 1;
-  elements.groupSwitcher.disabled = !commissionerMode;
-  elements.saveHole.disabled = isGroupComplete(currentGroupIndex) && !commissionerMode;
-  elements.nextHole.disabled = isGroupComplete(currentGroupIndex) && !commissionerMode;
+  elements.previousGroup.disabled = (!commissionerMode && !viewOnlyMode) || currentGroupIndex === 0;
+  elements.nextGroup.disabled = (!commissionerMode && !viewOnlyMode) || currentGroupIndex === roundSettings.groups.length - 1;
+  elements.groupSwitcher.disabled = !commissionerMode && !viewOnlyMode;
+  elements.saveHole.disabled = !canEdit || (isGroupComplete(currentGroupIndex) && !commissionerMode);
+  elements.previousHole.disabled = !canEdit || roundState.currentHoleIndex === 0;
+  elements.nextHole.disabled = !canEdit || (isGroupComplete(currentGroupIndex) && !commissionerMode);
+  elements.undoLastHole.disabled = !canEdit;
+  elements.holePlayers.querySelectorAll("button[data-player-id]").forEach((button) => {
+    button.disabled = !canEdit;
+  });
 }
 
 function renderCurrentHole() {
@@ -502,6 +530,19 @@ function getAssignedGroupIndex(playerId) {
   return groupIndex >= 0 ? groupIndex : 0;
 }
 
+function getPlayerGroupIndex(playerId) {
+  if (!roundSettings?.groups) return 0;
+  const groupIndex = roundSettings.groups.findIndex((group) => group.includes(playerId));
+  return groupIndex >= 0 ? groupIndex : 0;
+}
+
+function canEditCurrentGroup() {
+  if (!roundState) return false;
+  if (commissionerMode) return true;
+  if (viewOnlyMode) return false;
+  return Boolean(currentScorerId && roundSettings?.groupScorers?.[currentGroupIndex] === currentScorerId);
+}
+
 function renderScorerSelection() {
   const activePlayers = selectedPlayers.length
     ? selectedPlayers
@@ -519,6 +560,7 @@ function renderScorerSelection() {
 }
 
 function continueFromTodayRound() {
+  viewOnlyMode = false;
   if (roundState) {
     if (commissionerMode) {
       setActiveScreen("round");
@@ -558,18 +600,66 @@ function continueFromTodayRound() {
   elements.scorerAccessStatus.textContent = "No active event found yet. Ask the commissioner to create one.";
 }
 
+function viewLiveMatch() {
+  if (!roundState) {
+    showTodayRoundScreen();
+    elements.todayStatus.textContent = "No active round yet.";
+    return;
+  }
+
+  viewOnlyMode = true;
+  setActiveScreen("round");
+  renderApp();
+  elements.leaderboard.scrollIntoView({ behavior: "auto", block: "start" });
+}
+
+function choosePlayerOrScorer() {
+  if (!roundState) {
+    showTodayRoundScreen();
+    elements.todayStatus.textContent = "No active round yet.";
+    return;
+  }
+
+  if (currentScorerId) {
+    enterScorer(currentScorerId);
+    return;
+  }
+
+  renderScorerSelection();
+}
+
+function openCommissionerFromToday() {
+  if (commissionerMode) {
+    if (roundState) {
+      setActiveScreen("round");
+      renderApp();
+      scrollToScoring();
+      return;
+    }
+
+    openSetupWizard();
+    return;
+  }
+
+  elements.todayStatus.textContent = "Open the menu, enter the Commissioner PIN, then tap Commissioner Mode.";
+  elements.menuCommissionerPin.focus();
+}
+
 function enterScorer(playerId) {
   currentScorerId = playerId;
   commissionerMode = false;
+  viewOnlyMode = false;
   scorerStorage.saveScorerId(playerId);
   scorerStorage.setCommissionerMode(false);
 
   if (roundState) {
     if (roundSettings.groupScorers && !roundSettings.groupScorers.includes(playerId)) {
-      scorerStorage.clearScorerId();
-      currentScorerId = null;
-      renderScorerSelection();
-      elements.scorerAccessStatus.textContent = "You are not assigned as a scorer for this event.";
+      viewOnlyMode = true;
+      currentGroupIndex = getPlayerGroupIndex(playerId);
+      syncRoundStateToCurrentGroup();
+      setActiveScreen("round");
+      renderApp();
+      scrollToScoring();
       return;
     }
 
@@ -859,6 +949,7 @@ async function saveRosterToCloud() {
 
 function undoLastHole() {
   if (!roundState) return;
+  if (!canEditCurrentGroup()) return;
 
   const currentGroupPlayers = getCurrentGroupPlayers();
   const lastSavedHoleIndex = roundState.getLastSavedHoleIndexForPlayers(currentGroupPlayers);
@@ -1016,32 +1107,6 @@ async function initializeApp() {
 
   if (activeRound) {
     loadSavedRoundIntoState(activeRound);
-
-    if (roundSettings?.eventStatus === "Started" || roundSettings?.setupLocked) {
-      if (commissionerMode || currentScorerId) {
-        if (!commissionerMode && roundSettings.groupScorers && !roundSettings.groupScorers.includes(currentScorerId)) {
-          scorerStorage.clearScorerId();
-          currentScorerId = null;
-          renderScorerSelection();
-          elements.scorerAccessStatus.textContent = "Choose the scorer assigned to this event.";
-          return;
-        }
-
-        if (!commissionerMode) {
-          currentGroupIndex = getAssignedGroupIndex(currentScorerId);
-          syncRoundStateToCurrentGroup();
-        }
-
-        setActiveScreen("round");
-        renderApp();
-        scrollToScoring();
-        return;
-      }
-
-      renderScorerSelection();
-      return;
-    }
-
     showTodayRoundScreen();
     return;
   }
@@ -1087,7 +1152,9 @@ elements.confirmStartRound.addEventListener("click", beginGroupedRound);
 elements.resumeRound.addEventListener("click", resumeSavedRound);
 elements.startFreshRound.addEventListener("click", () => startFreshRound({ clearSavedRound: true }));
 elements.discardSavedRound.addEventListener("click", discardSavedRound);
-elements.continueToRound.addEventListener("click", continueFromTodayRound);
+elements.viewLiveMatch.addEventListener("click", viewLiveMatch);
+elements.choosePlayerScoring.addEventListener("click", choosePlayerOrScorer);
+elements.todayCommissionerMode.addEventListener("click", openCommissionerFromToday);
 elements.scorerList.addEventListener("click", (event) => {
   const scorerButton = event.target.closest("[data-scorer-id]");
 
@@ -1097,6 +1164,7 @@ elements.scorerList.addEventListener("click", (event) => {
 });
 elements.holePlayers.addEventListener("click", (event) => {
   if (!roundState) return;
+  if (!canEditCurrentGroup()) return;
 
   const button = event.target.closest("button[data-player-id]");
 
@@ -1109,12 +1177,14 @@ elements.holePlayers.addEventListener("click", (event) => {
 
 elements.previousHole.addEventListener("click", () => {
   if (!roundState) return;
+  if (!canEditCurrentGroup()) return;
 
   goToHoleForCurrentGroup((groupHoleIndexes[currentGroupIndex] ?? 0) - 1);
 });
 
 elements.nextHole.addEventListener("click", () => {
   if (!roundState) return;
+  if (!canEditCurrentGroup()) return;
 
   goToHoleForCurrentGroup((groupHoleIndexes[currentGroupIndex] ?? 0) + 1);
 });
@@ -1133,6 +1203,7 @@ elements.groupSwitcher.addEventListener("change", () => {
 
 elements.saveHole.addEventListener("click", async () => {
   if (!roundState) return;
+  if (!canEditCurrentGroup()) return;
 
   syncRoundStateToCurrentGroup();
   const savedHoleIndex = Math.min(

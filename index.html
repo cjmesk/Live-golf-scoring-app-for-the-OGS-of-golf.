@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OG&apos;s Golf</title>
-  <link rel="stylesheet" href="src/styles/main.css?v=20260710-today-round">
+  <link rel="stylesheet" href="src/styles/main.css?v=20260710-role-entry">
 </head>
 <body>
   <header class="app-header">
@@ -46,8 +46,8 @@
     <section id="todayScreen" class="today-section is-hidden" aria-labelledby="todayTitle">
       <div class="setup-header today-header">
         <div>
-          <p class="eyebrow dark">Today's Round</p>
-          <h2 id="todayTitle">OGS Golf</h2>
+          <p class="eyebrow dark">OGS Golf</p>
+          <h2 id="todayTitle">Today's OGS Match</h2>
         </div>
       </div>
 
@@ -69,12 +69,21 @@
           <strong id="todayPlayerCount">0</strong>
         </div>
         <div class="today-row">
-          <span>Start Time</span>
+          <span>Tee Time</span>
           <strong id="todayStartTime">Not set</strong>
+        </div>
+        <div class="today-row">
+          <span>Groups</span>
+          <strong id="todayGroupCount">0</strong>
         </div>
       </div>
 
-      <button id="continueToRound" type="button" class="save-button start-button">Continue to Round</button>
+      <div class="today-actions">
+        <button id="viewLiveMatch" type="button" class="save-button start-button">View Live Match</button>
+        <button id="choosePlayerScoring" type="button" class="secondary-button">I'm Playing / Scoring</button>
+        <button id="todayCommissionerMode" type="button" class="secondary-button">Commissioner Mode</button>
+      </div>
+      <div id="todayStatus" class="cloud-save-status"></div>
     </section>
 
     <section id="resumeScreen" class="resume-section is-hidden" aria-labelledby="resumeTitle">
@@ -409,7 +418,7 @@
   <script src="src/cloud/supabaseConfig.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/supabaseClient.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/roundCloudService.js?v=20260709-v098-menu"></script>
-  <script src="src/ui/dom.js?v=20260710-today-round"></script>
+  <script src="src/ui/dom.js?v=20260710-role-entry"></script>
   <script src="src/ui/formatters.js?v=20260710-index-course-handicap"></script>
   <script src="src/ui/setupView.js?v=20260709-v098-menu"></script>
   <script src="src/ui/holeView.js?v=20260710-index-course-handicap"></script>
@@ -421,6 +430,6 @@
   <script src="src/ui/playerManagementView.js?v=20260709-v098-menu"></script>
   <script src="src/ui/groupSetupView.js?v=20260709-v098-menu"></script>
   <script src="src/ui/eventSummaryView.js?v=20260710-preround-review"></script>
-  <script src="src/app.js?v=20260710-preround-review"></script>
+  <script src="src/app.js?v=20260710-role-entry"></script>
 </body>
 </html>

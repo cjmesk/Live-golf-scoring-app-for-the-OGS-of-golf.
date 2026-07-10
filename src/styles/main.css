@@ -248,6 +248,11 @@ body.is-scoring h1 {
   text-align: right;
 }
 
+.today-actions {
+  display: grid;
+  gap: 10px;
+}
+
 body.is-scoring .hole-section {
   margin-top: 0;
 }
