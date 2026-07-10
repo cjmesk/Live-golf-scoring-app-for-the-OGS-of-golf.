@@ -2,7 +2,27 @@ window.OGSGolf = window.OGSGolf || {};
 window.OGSGolf.ui = window.OGSGolf.ui || {};
 
 window.OGSGolf.ui.renderEventSummary = function renderEventSummary(elements, roundSettings) {
+  const { getCourseHandicap } = window.OGSGolf.rules;
   const eventDate = new Date().toLocaleDateString();
+  function getPointsQuota(courseHandicap) {
+    return Math.ceil((36 - (courseHandicap * 2)) * 2) / 2;
+  }
+
+  const playerRows = roundSettings.players
+    .map((player) => {
+      const courseHandicap = getCourseHandicap(player, roundSettings.course);
+      const quota = getPointsQuota(courseHandicap);
+
+      return `
+        <div class="summary-row">
+          <span>${player.name}</span>
+          <strong>${player.tee} tees</strong>
+          <small>Index ${player.handicap} | Course Handicap ${courseHandicap}</small>
+          <small>Points Quota: ${quota} per side / ${quota * 2} overall</small>
+        </div>
+      `;
+    })
+    .join("");
   const groupRows = roundSettings.groups
     .map((group, index) => {
       const playerNames = group
@@ -117,6 +137,11 @@ window.OGSGolf.ui.renderEventSummary = function renderEventSummary(elements, rou
     <section class="summary-block">
       <h3>Groups</h3>
       <div class="summary-list">${groupRows}</div>
+    </section>
+
+    <section class="summary-block">
+      <h3>Players, Tees, Handicaps, and Quotas</h3>
+      <div class="summary-list">${playerRows}</div>
     </section>
 
     <section class="summary-block">

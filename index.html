@@ -23,6 +23,7 @@
     </label>
     <button id="toggleCommissionerMode" type="button" class="menu-mode-button">Commissioner Mode: Off</button>
     <button type="button" data-menu-action="setup" class="admin-only">New Round / Setup Wizard</button>
+    <button type="button" data-menu-action="editSetup" class="admin-only">Edit Round Setup</button>
     <button type="button" data-menu-action="scoring">Live Scoring</button>
     <button type="button" data-menu-action="leaderboard">Leaderboard</button>
     <button type="button" data-menu-action="players" class="admin-only">Player Management</button>
@@ -174,8 +175,8 @@
     <section id="eventSummaryScreen" class="event-summary-section is-hidden" aria-labelledby="eventSummaryTitle">
       <div class="setup-header">
         <div>
-          <p class="eyebrow dark">Event Summary</p>
-          <h2 id="eventSummaryTitle">Step 4: Start Round</h2>
+          <p class="eyebrow dark">Pre-Round Review</p>
+          <h2 id="eventSummaryTitle">Review Before Starting</h2>
         </div>
       </div>
 
@@ -419,7 +420,7 @@
   <script src="src/ui/previousRoundsView.js?v=20260709-v098-menu"></script>
   <script src="src/ui/playerManagementView.js?v=20260709-v098-menu"></script>
   <script src="src/ui/groupSetupView.js?v=20260709-v098-menu"></script>
-  <script src="src/ui/eventSummaryView.js?v=20260709-v098-menu"></script>
-  <script src="src/app.js?v=20260710-today-round"></script>
+  <script src="src/ui/eventSummaryView.js?v=20260710-preround-review"></script>
+  <script src="src/app.js?v=20260710-preround-review"></script>
 </body>
 </html>

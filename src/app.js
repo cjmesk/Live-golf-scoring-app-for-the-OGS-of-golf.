@@ -87,7 +87,7 @@ function renderTodayRoundScreen() {
 
   elements.todayDate.textContent = formatTodayDate();
   elements.todayCourseName.textContent = eventCourseName;
-  elements.todayEventStatus.textContent = "Open";
+  elements.todayEventStatus.textContent = roundSettings?.eventStatus || "Open";
   elements.todayPlayerCount.textContent = String(playerCount);
   elements.todayStartTime.textContent = startTime;
 }
@@ -141,6 +141,14 @@ function showAdminRequiredMessage(message) {
 async function openSetupWizard({ focusTeamSetup = false } = {}) {
   if (!commissionerMode) {
     showAdminRequiredMessage("Turn on Commissioner Mode to start the setup wizard.");
+    return;
+  }
+
+  if (roundSettings?.eventStatus === "Started" || roundSettings?.setupLocked) {
+    setActiveScreen("round");
+    renderApp();
+    elements.modeStatus.textContent = "Round setup is locked because this event has started. Use Edit Round Setup for commissioner-only corrections.";
+    scrollToScoring();
     return;
   }
 
@@ -238,6 +246,24 @@ async function handleMenuAction(action) {
 
   if (action === "setup") {
     await openSetupWizard();
+    return;
+  }
+
+  if (action === "editSetup") {
+    if (!commissionerMode) {
+      showAdminRequiredMessage("Turn on Commissioner Mode to edit round setup.");
+      return;
+    }
+
+    if (!roundState) {
+      await openSetupWizard();
+      return;
+    }
+
+    setActiveScreen("round");
+    renderApp();
+    elements.modeStatus.textContent = "Edit Round Setup is commissioner-only. Setup is locked for scorers; make beta corrections from Commissioner View.";
+    scrollToScoring();
     return;
   }
 
@@ -885,7 +911,10 @@ function reviewEventSummary() {
 
   roundSettings = {
     ...pendingRoundSettings,
-    groups: readGroupAssignments(elements, pendingRoundSettings.players)
+    groups: readGroupAssignments(elements, pendingRoundSettings.players),
+    eventStatus: "Pre-Round Review",
+    setupLocked: false,
+    preRoundReviewComplete: false
   };
   roundSettings.groupScorers = readGroupScorers(elements, roundSettings.groups);
   renderEventSummary(elements, roundSettings);
@@ -898,9 +927,16 @@ function backToGroupSetup() {
   scrollToTop();
 }
 
-function beginGroupedRound() {
+async function beginGroupedRound() {
   if (!roundSettings) return;
 
+  roundSettings = {
+    ...roundSettings,
+    eventStatus: "Started",
+    setupLocked: true,
+    preRoundReviewComplete: true,
+    startedAt: new Date().toISOString()
+  };
   selectedCourse = roundSettings.course;
   selectedPlayers = roundSettings.players;
   roundState = createRoundState(selectedCourse, selectedPlayers, roundSettings);
@@ -911,7 +947,7 @@ function beginGroupedRound() {
 
   setActiveScreen("round");
   renderApp();
-  autoSaveUnfinishedRound();
+  await autoSaveUnfinishedRound();
   scrollToScoring();
 }
 
@@ -980,6 +1016,32 @@ async function initializeApp() {
 
   if (activeRound) {
     loadSavedRoundIntoState(activeRound);
+
+    if (roundSettings?.eventStatus === "Started" || roundSettings?.setupLocked) {
+      if (commissionerMode || currentScorerId) {
+        if (!commissionerMode && roundSettings.groupScorers && !roundSettings.groupScorers.includes(currentScorerId)) {
+          scorerStorage.clearScorerId();
+          currentScorerId = null;
+          renderScorerSelection();
+          elements.scorerAccessStatus.textContent = "Choose the scorer assigned to this event.";
+          return;
+        }
+
+        if (!commissionerMode) {
+          currentGroupIndex = getAssignedGroupIndex(currentScorerId);
+          syncRoundStateToCurrentGroup();
+        }
+
+        setActiveScreen("round");
+        renderApp();
+        scrollToScoring();
+        return;
+      }
+
+      renderScorerSelection();
+      return;
+    }
+
     showTodayRoundScreen();
     return;
   }
