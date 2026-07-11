@@ -26,9 +26,112 @@ function getSkinsWinner(round) {
     .join(", ");
 }
 
+function getRoundScoresByPlayer(round) {
+  const scoresByPlayer = {};
+
+  (round.players || []).forEach((player) => {
+    scoresByPlayer[player.id] = {
+      playerId: player.id,
+      playerName: player.name,
+      dnf: player.dnf || null,
+      grossScores: [],
+      netScores: []
+    };
+  });
+
+  if (round.savedScores) {
+    Object.entries(round.savedScores).forEach(([playerId, scores]) => {
+      scoresByPlayer[playerId] = scoresByPlayer[playerId] || {
+        playerId,
+        playerName: playerId,
+        dnf: null,
+        grossScores: [],
+        netScores: []
+      };
+      scoresByPlayer[playerId].grossScores = scores || [];
+    });
+  }
+
+  (round.holeByHole || []).forEach((hole, holeIndex) => {
+    (hole.scores || []).forEach((score) => {
+      scoresByPlayer[score.playerId] = scoresByPlayer[score.playerId] || {
+        playerId: score.playerId,
+        playerName: score.playerName || score.playerId,
+        dnf: null,
+        grossScores: [],
+        netScores: []
+      };
+      scoresByPlayer[score.playerId].playerName = score.playerName || scoresByPlayer[score.playerId].playerName;
+      scoresByPlayer[score.playerId].grossScores[holeIndex] = score.gross;
+      scoresByPlayer[score.playerId].netScores[holeIndex] = score.net;
+    });
+  });
+
+  return scoresByPlayer;
+}
+
+function calculateHistoryTotal(round, total) {
+  const scoresByPlayer = getRoundScoresByPlayer(round);
+  const scoreRecord = scoresByPlayer[total.playerId] || {};
+  const grossScores = scoreRecord.grossScores || [];
+  const netScores = scoreRecord.netScores || [];
+  const dnf = total.dnf || scoreRecord.dnf || null;
+  const scoredGross = grossScores
+    .map((score, index) => ({ score, index }))
+    .filter(({ score }) => score !== null && score !== undefined && Number.isFinite(Number(score)));
+  const scoredNet = netScores
+    .map((score, index) => ({ score, index }))
+    .filter(({ score }) => score !== null && score !== undefined && Number.isFinite(Number(score)));
+  const frontGrossScores = scoredGross.filter(({ index }) => index < 9);
+  const backGrossScores = scoredGross.filter(({ index }) => index >= 9);
+  const frontNetScores = scoredNet.filter(({ index }) => index < 9);
+  const backNetScores = scoredNet.filter(({ index }) => index >= 9);
+  const gross = scoredGross.reduce((sum, item) => sum + Number(item.score), 0);
+  const net = scoredNet.reduce((sum, item) => sum + Number(item.score), 0);
+  const requiredHoles = Math.max(round.holeByHole?.length || 0, grossScores.length || 0, 18);
+  const shouldRecalculate =
+    scoredGross.length > 0
+    && (!total.holesPlayed || total.gross === 0 || total.gross === null || total.gross === undefined);
+
+  if (!shouldRecalculate) {
+    return total;
+  }
+
+  return {
+    ...total,
+    playerName: total.playerName || scoreRecord.playerName,
+    gross,
+    frontGross: frontGrossScores.length >= 9
+      ? frontGrossScores.reduce((sum, item) => sum + Number(item.score), 0)
+      : null,
+    backGross: backGrossScores.length >= 9
+      ? backGrossScores.reduce((sum, item) => sum + Number(item.score), 0)
+      : null,
+    frontGrossHoles: frontGrossScores.length,
+    backGrossHoles: backGrossScores.length,
+    net: scoredNet.length >= requiredHoles && !dnf ? net : null,
+    frontNet: frontNetScores.length >= 9
+      ? frontNetScores.reduce((sum, item) => sum + Number(item.score), 0)
+      : null,
+    backNet: backNetScores.length >= 9
+      ? backNetScores.reduce((sum, item) => sum + Number(item.score), 0)
+      : null,
+    holesPlayed: scoredGross.length,
+    dnf: dnf ? {
+      ...dnf,
+      holesCompleted: dnf.holesCompleted ?? scoredGross.length,
+      grossStrokes: dnf.grossStrokes ?? gross
+    } : null
+  };
+}
+
+function getHistoryTotals(round) {
+  return (round.totals || []).map((total) => calculateHistoryTotal(round, total));
+}
+
 function formatPreviousGross(total) {
   if (total.dnf) {
-    return `DNF - ${total.dnf.holesCompleted} holes - ${total.dnf.grossStrokes} strokes`;
+    return `DNF · ${total.dnf.holesCompleted} holes · ${total.dnf.grossStrokes} strokes`;
   }
 
   const holesPlayed = total.holesPlayed || 18;
@@ -42,7 +145,11 @@ function formatPreviousGross(total) {
     ? `Back ${total.backGross} through ${total.backGrossHoles}`
     : `Back ${total.backGross ?? "-"}`;
 
-  return `${grossText} | ${frontText} | ${backText}`;
+  const frontNet = total.frontNet === null || total.frontNet === undefined ? "Front Net -" : `Front Net ${total.frontNet}`;
+  const backNet = total.backNet === null || total.backNet === undefined ? "Back Net -" : `Back Net ${total.backNet}`;
+  const net = total.net === null || total.net === undefined ? "Net -" : `Net ${total.net}`;
+
+  return `${grossText} | ${frontText} | ${backText} | ${frontNet} | ${backNet} | ${net}`;
 }
 
 window.OGSGolf.ui.renderPreviousRounds = function renderPreviousRounds(elements, rounds) {
@@ -63,11 +170,11 @@ window.OGSGolf.ui.renderPreviousRounds = function renderPreviousRounds(elements,
       const grossWinner = getLeaderNames(round.winners?.gross);
       const netWinner = getLeaderNames(round.winners?.net);
       const skinsWinner = getSkinsWinner(round);
-      const totals = (round.totals || [])
+      const totals = getHistoryTotals(round)
         .map((total) => `
           <div class="previous-total-row">
             <span>${total.playerName}</span>
-            <small>${formatPreviousGross(total)} | Net ${total.net} | ${total.points} pts | Skins ${total.skinsWon}</small>
+            <small>${formatPreviousGross(total)} | ${total.points} pts | Skins ${total.skinsWon}</small>
           </div>
         `)
         .join("");

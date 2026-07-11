@@ -1100,6 +1100,33 @@ function areAllGroupsComplete() {
   return roundSettings.groups.every((group, index) => isGroupComplete(index));
 }
 
+function logFinalCompletionCheck(context) {
+  if (!roundSettings?.groups?.length) return false;
+
+  syncAllGroupCompletionsFromScores();
+  const groupStatuses = roundSettings.groups.map((group, index) => {
+    const record = getGroupRecord(index);
+    const complete = isGroupComplete(index);
+
+    return {
+      group: index + 1,
+      status: record.status,
+      completedHoleNumbers: record.completedHoleNumbers,
+      holesToPlay: record.holesToPlay,
+      complete
+    };
+  });
+  const allComplete = groupStatuses.every((groupStatus) => groupStatus.complete);
+
+  console.log("[OGS Golf] Final completion check", {
+    context,
+    groups: groupStatuses,
+    allGroupsComplete: allComplete
+  });
+
+  return allComplete;
+}
+
 function syncRoundStateToCurrentGroup() {
   if (!roundState) return;
 
@@ -1427,20 +1454,46 @@ async function autoSaveUnfinishedRound(savedGroupIndex, savedHoleIndex) {
 }
 
 function saveCompletedRound() {
-  if (!roundState || completedRoundSaved) return;
+  if (!roundState || completedRoundSaved) return null;
 
-  roundStorage.save(roundState.getRoundExport());
+  const completedRound = roundState.getRoundExport();
+  roundStorage.save(completedRound);
   roundStorage.clearUnfinished();
   completedRoundSaved = true;
+  return completedRound;
 }
 
 function showFinalSummary() {
+  if (elements.summaryTitle) {
+    elements.summaryTitle.textContent = "Round Complete";
+  }
   setActiveScreen("summary");
   renderFinalSummary(elements, roundState);
   elements.cloudSaveStatus.textContent = completedRoundSaved
     ? "Final scores recorded."
-    : "Review scores, then tap Confirm Final Scores.";
+    : "Round complete. Review scores, then tap Confirm Final Scores.";
   scrollToTop();
+}
+
+async function completeFullRoundIfReady(context = "completion-check") {
+  if (!roundState) return false;
+
+  const allComplete = logFinalCompletionCheck(context);
+
+  if (!allComplete) return false;
+
+  saveCompletedRound();
+  showFinalSummary();
+
+  try {
+    await roundCloudService.saveCompletedRound(roundState.getRoundExport());
+    await roundCloudService.clearActiveRound();
+    elements.cloudSaveStatus.textContent = "Round Complete. Final scores saved locally and to cloud.";
+  } catch (error) {
+    elements.cloudSaveStatus.textContent = "Round Complete. Final scores saved locally. Cloud save did not finish.";
+  }
+
+  return true;
 }
 
 function reviewScorecard() {
@@ -1979,6 +2032,20 @@ async function initializeApp() {
   const localRound = roundStorage.getUnfinished();
   let activeRound = localRound;
 
+  if (localRound && !localRound.completed) {
+    const completedRoundsResult = await roundCloudService.loadCompletedRounds();
+    const completedMatch = completedRoundsResult.rounds?.find((round) => round.id === localRound.id);
+
+    if (completedMatch) {
+      roundStorage.clearUnfinished();
+      roundStorage.save(completedMatch);
+      loadSavedRoundIntoState(completedMatch);
+      completedRoundSaved = true;
+      showFinalSummary();
+      return;
+    }
+  }
+
   if (!activeRound) {
     const cloudResult = await roundCloudService.loadActiveRound();
     activeRound = cloudResult.round;
@@ -2228,6 +2295,12 @@ elements.saveHole.addEventListener("click", async () => {
   if (mergedRound) {
     loadSavedRoundIntoState(mergedRound);
   }
+  const fullRoundCompleted = await completeFullRoundIfReady("after-save-hole");
+
+  if (fullRoundCompleted) {
+    return;
+  }
+
   renderApp();
   if (mergedRound) {
     showSaveStatus(savedHoleIndex, savedGroupIndex);
@@ -2251,6 +2324,15 @@ elements.resetScores.addEventListener("click", async () => {
 });
 
 elements.reviewScorecard.addEventListener("click", reviewScorecard);
+elements.viewFinalLeaderboard.addEventListener("click", () => {
+  if (!roundState) return;
+
+  setActiveScreen("round");
+  renderApp();
+  showLeaderboardPage();
+});
+elements.summaryPreviousRounds.addEventListener("click", showPreviousRounds);
+elements.summaryReturnHome.addEventListener("click", showTodayRoundScreen);
 elements.undoLastHole.addEventListener("click", undoLastHole);
 elements.summaryUndoLastHole.addEventListener("click", undoLastHole);
 elements.startNewRound.addEventListener("click", startNewRound);

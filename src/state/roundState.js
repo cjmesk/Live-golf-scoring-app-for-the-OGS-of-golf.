@@ -430,6 +430,75 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     };
   }
 
+  function getPlayerExportTotals(player) {
+    const dnfStatus = getPlayerDnfStatus(player);
+    const totals = savedScores[player.id].reduce(
+      (playerTotals, score, holeIndex) => {
+        if (score === null || score === undefined) return playerTotals;
+
+        const grossScore = Number(score);
+        const holeResult = getPlayerHoleResult(player, holeIndex);
+        const netScore = holeResult?.netScore;
+
+        playerTotals.gross += grossScore;
+        playerTotals.holesPlayed += 1;
+
+        if (Number.isFinite(Number(netScore))) {
+          playerTotals.net += Number(netScore);
+        }
+
+        if (holeIndex < 9) {
+          playerTotals.frontGross += grossScore;
+          playerTotals.frontGrossHoles += 1;
+
+          if (Number.isFinite(Number(netScore))) {
+            playerTotals.frontNet += Number(netScore);
+          }
+        } else {
+          playerTotals.backGross += grossScore;
+          playerTotals.backGrossHoles += 1;
+
+          if (Number.isFinite(Number(netScore))) {
+            playerTotals.backNet += Number(netScore);
+          }
+        }
+
+        return playerTotals;
+      },
+      {
+        gross: 0,
+        frontGross: 0,
+        backGross: 0,
+        frontGrossHoles: 0,
+        backGrossHoles: 0,
+        net: 0,
+        frontNet: 0,
+        backNet: 0,
+        holesPlayed: 0
+      }
+    );
+
+    const completedFront = totals.frontGrossHoles >= 9;
+    const completedBack = totals.backGrossHoles >= 9;
+    const completedRound = totals.holesPlayed >= totalHoles;
+
+    return {
+      ...totals,
+      frontGross: completedFront ? totals.frontGross : null,
+      backGross: completedBack ? totals.backGross : null,
+      gross: completedRound ? totals.gross : totals.gross,
+      frontNet: completedFront ? totals.frontNet : null,
+      backNet: completedBack ? totals.backNet : null,
+      net: completedRound ? totals.net : null,
+      completedFront,
+      completedBack,
+      completedRound,
+      dnf: dnfStatus,
+      dnfGrossStrokes: dnfStatus?.grossStrokes ?? null,
+      dnfHolesCompleted: dnfStatus?.holesCompleted ?? null
+    };
+  }
+
   function getTeamChallengeTeams() {
     if (!roundSettings.games.teamChallenge?.enabled) return [];
 
@@ -523,16 +592,24 @@ window.OGSGolf.state.createRoundState = function createRoundState(
           playerNames: team.players.map((player) => player.name)
         }))
       },
-      totals: finalSummary.playerTotals.map((item) => ({
+      totals: finalSummary.playerTotals.map((item) => {
+        const exportTotals = getPlayerExportTotals(item.player);
+
+        return {
         playerId: item.player.id,
         playerName: item.player.name,
-        gross: item.totals.gross,
-        frontGross: item.totals.frontGross,
-        backGross: item.totals.backGross,
-        frontGrossHoles: item.totals.frontGrossHoles,
-        backGrossHoles: item.totals.backGrossHoles,
-        holesPlayed: item.totals.holesPlayed,
-        net: item.totals.net,
+        gross: exportTotals.gross,
+        frontGross: exportTotals.frontGross,
+        backGross: exportTotals.backGross,
+        frontGrossHoles: exportTotals.frontGrossHoles,
+        backGrossHoles: exportTotals.backGrossHoles,
+        holesPlayed: exportTotals.holesPlayed,
+        net: exportTotals.net,
+        frontNet: exportTotals.frontNet,
+        backNet: exportTotals.backNet,
+        completedFront: exportTotals.completedFront,
+        completedBack: exportTotals.completedBack,
+        completedRound: exportTotals.completedRound,
         points: item.totals.points,
         frontPoints: item.totals.frontPoints,
         backPoints: item.totals.backPoints,
@@ -547,8 +624,11 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         overallPointsResult: getPointsDifferential(item.player, "overall").display,
         skinsWon: item.skins.totalSkins,
         skinHoles: item.skins.holesWon,
-        dnf: item.dnf
-      })),
+        dnf: exportTotals.dnf,
+        dnfGrossStrokes: exportTotals.dnfGrossStrokes,
+        dnfHolesCompleted: exportTotals.dnfHolesCompleted
+        };
+      }),
       winners: {
         gross: finalSummary.grossWinner,
         net: finalSummary.netWinner,
