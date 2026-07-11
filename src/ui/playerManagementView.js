@@ -81,7 +81,10 @@ window.OGSGolf.ui.renderPlayerManagement = function renderPlayerManagement(eleme
           </span>
           <span class="player-details">Player ID: ${escapeRosterText(player.id)}</span>
         </div>
-        <button type="button" class="secondary-button" data-edit-player="${escapeRosterText(player.id)}">Edit</button>
+        <div class="player-management-row-actions">
+          <button type="button" class="secondary-button" data-edit-player="${escapeRosterText(player.id)}">Edit</button>
+          <button type="button" class="secondary-button" data-remove-player="${escapeRosterText(player.id)}">Remove</button>
+        </div>
       </div>
     `)
     .join("");

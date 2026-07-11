@@ -3,18 +3,33 @@ window.OGSGolf.state = window.OGSGolf.state || {};
 
 window.OGSGolf.state.scorerStorage = {
   scorerKey: "ogsGolfScorerId",
+  scorerByRoundPrefix: "ogsGolfScorerId:",
   commissionerKey: "ogsGolfCommissionerMode",
   commissionerPin: "1234",
 
-  getScorerId() {
-    return window.localStorage.getItem(this.scorerKey);
+  getRoundScorerKey(roundId) {
+    return `${this.scorerByRoundPrefix}${roundId}`;
   },
 
-  saveScorerId(playerId) {
-    window.localStorage.setItem(this.scorerKey, playerId);
+  getScorerId(roundId) {
+    if (roundId) {
+      return window.localStorage.getItem(this.getRoundScorerKey(roundId));
+    }
+
+    return null;
   },
 
-  clearScorerId() {
+  saveScorerId(playerId, roundId) {
+    if (!roundId) return;
+
+    window.localStorage.setItem(this.getRoundScorerKey(roundId), playerId);
+  },
+
+  clearScorerId(roundId) {
+    if (roundId) {
+      window.localStorage.removeItem(this.getRoundScorerKey(roundId));
+    }
+
     window.localStorage.removeItem(this.scorerKey);
   },
 

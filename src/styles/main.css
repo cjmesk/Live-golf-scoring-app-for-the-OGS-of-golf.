@@ -255,9 +255,14 @@ body.is-scoring h1 {
 
 .score-nav {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-bottom: 10px;
+}
+
+@media (min-width: 640px) {
+  .score-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .round-screen .leaderboard-section {
@@ -981,6 +986,12 @@ body.is-scoring .current-hole-status {
 .player-management-header,
 .player-management-row {
   display: grid;
+  gap: 8px;
+}
+
+.player-management-row-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 

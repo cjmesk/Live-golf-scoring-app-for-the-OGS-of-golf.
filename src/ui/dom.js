@@ -85,6 +85,7 @@ window.OGSGolf.ui.getElements = function getElements() {
     startNewRound: document.querySelector("#startNewRound"),
     roundSettingsSummary: document.querySelector("#roundSettingsSummary"),
     changeScorer: document.querySelector("#changeScorer"),
+    changeScorerQuick: document.querySelector("#changeScorerQuick"),
     scoreMyGroup: document.querySelector("#scoreMyGroup"),
     viewOverallLeaderboard: document.querySelector("#viewOverallLeaderboard"),
     changeScorerLeaderboard: document.querySelector("#changeScorerLeaderboard"),

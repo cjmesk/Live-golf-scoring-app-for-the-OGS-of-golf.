@@ -36,7 +36,7 @@ let statusTimer = null;
 let completedRoundSaved = false;
 let currentGroupIndex = 0;
 let groupHoleIndexes = [];
-let currentScorerId = scorerStorage.getScorerId();
+let currentScorerId = null;
 let commissionerMode = scorerStorage.isCommissioner();
 let viewOnlyMode = false;
 let pendingDnfPlayerId = null;
@@ -79,6 +79,22 @@ function scrollToScoring() {
 
 function getCurrentScorerName() {
   return members.find((member) => member.id === currentScorerId)?.name || "Scorer";
+}
+
+function getCurrentRoundId() {
+  return roundState?.id || null;
+}
+
+function loadScorerForCurrentRound() {
+  currentScorerId = getCurrentRoundId()
+    ? scorerStorage.getScorerId(getCurrentRoundId())
+    : null;
+  return currentScorerId;
+}
+
+function clearScorerForCurrentRound() {
+  scorerStorage.clearScorerId(getCurrentRoundId());
+  currentScorerId = null;
 }
 
 function formatTodayDate() {
@@ -214,6 +230,12 @@ function showLiveScoring() {
 
     renderScorerSelection();
     elements.scorerAccessStatus.textContent = "No active round yet. Ask the commissioner to start one.";
+    return;
+  }
+
+  if (!commissionerMode && !currentScorerId) {
+    renderScorerSelection();
+    elements.scorerAccessStatus.textContent = "Choose the scorer assigned to this device for this match.";
     return;
   }
 
@@ -393,7 +415,7 @@ function setCommissionerMode(isOn) {
   currentScorerId = isOn ? null : currentScorerId;
 
   if (isOn) {
-    scorerStorage.clearScorerId();
+    clearScorerForCurrentRound();
     scoreOverrideReturnGroupIndex = currentGroupIndex;
   } else {
     scoreOverrideOpen = false;
@@ -616,8 +638,8 @@ async function loadRosterFromCloud({ manual = false } = {}) {
 
   const result = await roundCloudService.loadPlayers();
 
-  if (result.ok && result.players.length > 0) {
-    members = mergeRoster(playerStorage.getAll(defaultPlayers), result.players);
+  if (result.ok) {
+    members = result.players;
     playerStorage.saveAll(members);
     renderSetupView(elements, courses, members);
 
@@ -629,7 +651,7 @@ async function loadRosterFromCloud({ manual = false } = {}) {
       elements.playerManagementStatus.textContent = result.message;
     }
 
-    showRosterCloudStatus(result.message);
+    showRosterCloudStatus(result.message || "Roster loaded from Supabase.");
     return true;
   }
 
@@ -1142,6 +1164,12 @@ function renderApp() {
 function showScoreMyGroup() {
   if (!roundState) return;
 
+  if (!commissionerMode && !currentScorerId) {
+    renderScorerSelection();
+    elements.scorerAccessStatus.textContent = "Choose the scorer assigned to this device for this match.";
+    return;
+  }
+
   if (!commissionerMode && !viewOnlyMode && currentScorerId) {
     currentGroupIndex = getAssignedGroupIndex(currentScorerId);
     syncRoundStateToCurrentGroup();
@@ -1181,16 +1209,31 @@ function canEditCurrentGroup() {
 }
 
 function renderScorerSelection() {
-  const activePlayers = selectedPlayers.length
-    ? selectedPlayers
-    : members.filter((member) => member.active);
-  elements.scorerList.innerHTML = activePlayers
-    .map((player) => `
-      <button type="button" class="secondary-button" data-scorer-id="${player.id}">
-        ${player.name}
+  const assignedScorerIds = roundSettings?.groupScorers
+    ? Array.from(new Set(roundSettings.groupScorers.filter(Boolean)))
+    : [];
+  const assignedScorers = assignedScorerIds
+    .map((scorerId) => selectedPlayers.find((player) => player.id === scorerId)
+      || members.find((member) => member.id === scorerId))
+    .filter(Boolean);
+
+  elements.scorerList.innerHTML = roundState
+    ? `
+      ${assignedScorers
+        .map((player) => {
+          const groupIndex = getAssignedGroupIndex(player.id);
+          return `
+            <button type="button" class="secondary-button" data-scorer-id="${player.id}">
+              ${player.name} - Group ${groupIndex + 1} scorer
+            </button>
+          `;
+        })
+        .join("")}
+      <button type="button" class="secondary-button" data-view-leaderboard-only="true">
+        View Leaderboard Only
       </button>
-    `)
-    .join("");
+    `
+    : `<span class="player-details">No active match is ready yet.</span>`;
   elements.scorerAccessStatus.textContent = "";
   setActiveScreen("scorer");
   scrollToTop();
@@ -1209,8 +1252,7 @@ function continueFromTodayRound() {
 
     if (currentScorerId) {
       if (roundSettings.groupScorers && !roundSettings.groupScorers.includes(currentScorerId)) {
-        scorerStorage.clearScorerId();
-        currentScorerId = null;
+        clearScorerForCurrentRound();
         renderScorerSelection();
         elements.scorerAccessStatus.textContent = "Choose the scorer assigned to this group.";
         return;
@@ -1286,23 +1328,18 @@ function openCommissionerFromToday() {
 }
 
 function enterScorer(playerId) {
+  if (roundState && roundSettings.groupScorers && !roundSettings.groupScorers.includes(playerId)) {
+    viewLiveMatch();
+    return;
+  }
+
   currentScorerId = playerId;
   commissionerMode = false;
   viewOnlyMode = false;
-  scorerStorage.saveScorerId(playerId);
+  scorerStorage.saveScorerId(playerId, getCurrentRoundId());
   scorerStorage.setCommissionerMode(false);
 
   if (roundState) {
-    if (roundSettings.groupScorers && !roundSettings.groupScorers.includes(playerId)) {
-      viewOnlyMode = true;
-      currentGroupIndex = getPlayerGroupIndex(playerId);
-      syncRoundStateToCurrentGroup();
-      setActiveScreen("round");
-      renderApp();
-      showLeaderboardPage();
-      return;
-    }
-
     currentGroupIndex = getAssignedGroupIndex(playerId);
     syncRoundStateToCurrentGroup();
     setActiveScreen("round");
@@ -1448,8 +1485,7 @@ function startNewRound() {
 
 async function clearRoundCacheForReset() {
   roundStorage.clearUnfinished();
-  scorerStorage.clearScorerId();
-  currentScorerId = null;
+  clearScorerForCurrentRound();
   return roundCloudService.clearActiveRound();
 }
 
@@ -1501,16 +1537,20 @@ function showPreviousRounds() {
   scrollToTop();
 }
 
-function showPlayerManagement() {
+async function showPlayerManagement() {
   if (!commissionerMode) {
     renderScorerSelection();
     elements.scorerAccessStatus.textContent = "Enter Commissioner View to manage players.";
     return;
   }
 
-  renderPlayerManagement(elements, members, maxRosterSize);
-  elements.playerManagementStatus.textContent = "Roster changes are saved on this device first.";
+  elements.playerManagementStatus.textContent = "Loading latest roster from Supabase...";
   setActiveScreen("players");
+  await loadRosterFromCloud({ manual: true });
+  renderPlayerManagement(elements, members, maxRosterSize);
+  if (!elements.playerManagementStatus.textContent) {
+    elements.playerManagementStatus.textContent = "Roster loaded.";
+  }
   scrollToTop();
 }
 
@@ -1576,7 +1616,7 @@ function findDuplicatePlayer(formPlayer, editingId) {
   });
 }
 
-function savePlayer(event) {
+async function savePlayer(event) {
   event.preventDefault();
 
   const formResult = readPlayerForm(elements);
@@ -1607,23 +1647,40 @@ function savePlayer(event) {
     return;
   }
 
+  const wasEditing = Boolean(editingId);
+  let nextMembers;
+
   if (editingId) {
     if (!members.some((player) => player.id === editingId)) {
       elements.playerManagementStatus.textContent = "Could not find the existing player record to update.";
       return;
     }
 
-    members = members.map((player) => (player.id === editingId ? formPlayer : player));
+    nextMembers = members.map((player) => (player.id === editingId ? formPlayer : player));
   } else {
-    members = [...members, { ...formPlayer, id: getUniquePlayerId(formPlayer.id) }];
+    nextMembers = [...members, { ...formPlayer, id: getUniquePlayerId(formPlayer.id) }];
   }
 
+  elements.playerManagementStatus.textContent = wasEditing
+    ? "Updating player in Supabase..."
+    : "Saving player to Supabase...";
+  members = nextMembers;
   playerStorage.saveAll(members);
+  renderPlayerManagement(elements, members, maxRosterSize);
+
+  const result = await roundCloudService.savePlayers(members);
+
+  if (!result.ok) {
+    elements.playerManagementStatus.textContent =
+      `${result.message} Local cache was updated on this device only.`;
+    return;
+  }
+
   clearPlayerForm(elements);
   renderPlayerManagement(elements, members, maxRosterSize);
-  elements.playerManagementStatus.textContent = formPlayer.active
-    ? "Player saved on this device."
-    : "Player marked inactive. Historical round data is preserved.";
+  elements.playerManagementStatus.textContent = wasEditing
+    ? "Player updated in cloud"
+    : "Player saved to cloud";
 }
 
 function exportRosterBackup() {
@@ -1655,6 +1712,31 @@ async function saveRosterToCloud() {
 
   const result = await roundCloudService.savePlayers(members);
   elements.playerManagementStatus.textContent = result.message;
+}
+
+async function removePlayerFromRoster(playerId) {
+  const player = members.find((member) => member.id === playerId);
+
+  if (!player) return;
+
+  const confirmed = window.confirm(`Remove ${player.name} from the shared roster?`);
+
+  if (!confirmed) return;
+
+  elements.playerManagementStatus.textContent = `Removing ${player.name} from Supabase...`;
+
+  const result = await roundCloudService.deletePlayer(playerId);
+
+  if (!result.ok) {
+    elements.playerManagementStatus.textContent = result.message;
+    return;
+  }
+
+  members = members.filter((member) => member.id !== playerId);
+  playerStorage.saveAll(members);
+  clearPlayerForm(elements);
+  renderPlayerManagement(elements, members, maxRosterSize);
+  elements.playerManagementStatus.textContent = "Player removed from cloud";
 }
 
 function undoLastHole() {
@@ -1850,12 +1932,13 @@ function loadSavedRoundIntoState(savedRound) {
     players: selectedPlayers
   };
   roundState = createRoundState(selectedCourse, selectedPlayers, roundSettings, savedRound);
-  currentGroupIndex = savedRound.currentGroupIndex || 0;
+  currentGroupIndex = commissionerMode ? (savedRound.currentGroupIndex || 0) : 0;
   roundSettings.groupRecords = roundSettings.groupRecords || savedRound.roundSettings?.groupRecords || [];
   groupHoleIndexes = savedRound.groupHoleIndexes || roundSettings.groups.map((group, index) =>
     Math.max(0, (getGroupRecord(index).currentHole || savedRound.currentHole || 1) - 1)
   );
   syncAllGroupCompletionsFromScores();
+  loadScorerForCurrentRound();
 
   if (!commissionerMode && currentScorerId) {
     currentGroupIndex = getAssignedGroupIndex(currentScorerId);
@@ -1984,7 +2067,13 @@ elements.viewLiveMatch.addEventListener("click", viewLiveMatch);
 elements.choosePlayerScoring.addEventListener("click", choosePlayerOrScorer);
 elements.todayCommissionerMode.addEventListener("click", openCommissionerFromToday);
 elements.scorerList.addEventListener("click", (event) => {
+  const leaderboardOnlyButton = event.target.closest("[data-view-leaderboard-only]");
   const scorerButton = event.target.closest("[data-scorer-id]");
+
+  if (leaderboardOnlyButton) {
+    viewLiveMatch();
+    return;
+  }
 
   if (!scorerButton) return;
 
@@ -2172,10 +2261,16 @@ elements.refreshCloudRounds.addEventListener("click", loadPreviousRoundsFromClou
 elements.backFromPreviousRounds.addEventListener("click", returnFromPreviousRounds);
 elements.showPlayerManagement.addEventListener("click", showPlayerManagement);
 elements.changeScorer.addEventListener("click", () => {
-  scorerStorage.clearScorerId();
+  clearScorerForCurrentRound();
   scorerStorage.setCommissionerMode(false);
-  currentScorerId = null;
   commissionerMode = false;
+  renderScorerSelection();
+});
+elements.changeScorerQuick.addEventListener("click", () => {
+  clearScorerForCurrentRound();
+  scorerStorage.setCommissionerMode(false);
+  commissionerMode = false;
+  viewOnlyMode = false;
   renderScorerSelection();
 });
 elements.scoreMyGroup.addEventListener("click", showScoreMyGroup);
@@ -2198,6 +2293,12 @@ elements.saveRosterCloud.addEventListener("click", saveRosterToCloud);
 elements.backFromPlayerManagement.addEventListener("click", returnFromPlayerManagement);
 elements.playerManagementList.addEventListener("click", (event) => {
   const editButton = event.target.closest("[data-edit-player]");
+  const removeButton = event.target.closest("[data-remove-player]");
+
+  if (removeButton) {
+    removePlayerFromRoster(removeButton.dataset.removePlayer);
+    return;
+  }
 
   if (!editButton) return;
 

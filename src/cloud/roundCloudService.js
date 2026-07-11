@@ -352,3 +352,40 @@ window.OGSGolf.cloud.roundCloudService.loadPlayers = async function loadPlayers(
     };
   }
 };
+
+window.OGSGolf.cloud.roundCloudService.deletePlayer = async function deletePlayer(playerId) {
+  const config = window.OGSGolf.cloud.supabaseConfig;
+
+  if (!config.url || !config.anonKey) {
+    return {
+      ok: false,
+      reason: "not-configured",
+      message: "Cloud roster remove is not set up yet. The player was not removed from the shared roster."
+    };
+  }
+
+  try {
+    const response = await fetch(`${config.url}/rest/v1/players?id=eq.${encodeURIComponent(playerId)}`, {
+      method: "DELETE",
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.anonKey}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("Player roster delete failed.");
+    }
+
+    return {
+      ok: true,
+      message: "Player removed from cloud"
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "failed",
+      message: "Cloud remove failed. The player was not removed from the shared roster."
+    };
+  }
+};
