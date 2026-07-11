@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OG&apos;s Golf</title>
-  <link rel="stylesheet" href="src/styles/main.css?v=20260711-scorecard-mobile">
+      <link rel="stylesheet" href="src/styles/main.css?v=20260711-group-complete-fix">
 </head>
 <body>
   <header class="app-header">
@@ -236,14 +236,27 @@
       </div>
 
       <div id="holePlayers" class="hole-players"></div>
+      <div id="dnfConfirmPanel" class="dnf-confirm-panel is-hidden">
+        <p id="dnfConfirmMessage"></p>
+        <div class="dnf-confirm-actions">
+          <button id="cancelDnf" type="button" class="secondary-button">Cancel</button>
+          <button id="confirmDnf" type="button" class="save-button">Confirm DNF</button>
+        </div>
+      </div>
 
-      <div id="commissionerGroupControls" class="group-nav-row is-hidden">
-        <button id="previousGroup" type="button" class="secondary-button">Previous Group</button>
-        <label class="group-switcher-label">
+      <div id="commissionerGroupControls" class="commissioner-override-panel is-hidden">
+        <button id="toggleScoreOverride" type="button" class="secondary-button">Score Override</button>
+        <div id="scoreOverrideBanner" class="override-banner is-hidden">
+          <strong id="scoreOverrideBannerText">Commissioner Override - Scoring Group 1</strong>
+          <button id="exitScoreOverride" type="button" class="secondary-button">Exit Override</button>
+        </div>
+        <div id="scoreOverrideList" class="score-override-list is-hidden"></div>
+        <button id="previousGroup" type="button" class="secondary-button is-hidden">Previous Group</button>
+        <label class="group-switcher-label is-hidden">
           <span>Commissioner Group Selector</span>
           <select id="groupSwitcher" class="field-control"></select>
         </label>
-        <button id="nextGroup" type="button" class="secondary-button">Next Group</button>
+        <button id="nextGroup" type="button" class="secondary-button is-hidden">Next Group</button>
       </div>
 
       <div class="action-row">
@@ -489,24 +502,24 @@
   <script src="src/rules/skins.js?v=20260709-v098-menu"></script>
   <script src="src/state/playerStorage.js?v=20260709-v098-menu"></script>
   <script src="src/state/scorerStorage.js?v=20260709-v098-menu"></script>
-  <script src="src/state/roundState.js?v=20260710-gross-totals"></script>
+  <script src="src/state/roundState.js?v=20260711-dnf"></script>
   <script src="src/state/roundStorage.js?v=20260709-v098-menu"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="src/cloud/supabaseConfig.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/supabaseClient.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/roundCloudService.js?v=20260709-v098-menu"></script>
-  <script src="src/ui/dom.js?v=20260710-scorekeeper-group-lock"></script>
+  <script src="src/ui/dom.js?v=20260711-score-override"></script>
   <script src="src/ui/formatters.js?v=20260710-index-course-handicap"></script>
   <script src="src/ui/setupView.js?v=20260710-round-setup"></script>
-  <script src="src/ui/holeView.js?v=20260710-scorekeeper-simple"></script>
-  <script src="src/ui/leaderboardView.js?v=20260710-gross-totals"></script>
+  <script src="src/ui/holeView.js?v=20260711-dnf-options"></script>
+  <script src="src/ui/leaderboardView.js?v=20260711-gross-hole-count"></script>
   <script src="src/ui/pointsPayoutView.js?v=20260710-points-quota"></script>
   <script src="src/ui/skinsView.js?v=20260709-v098-menu"></script>
-  <script src="src/ui/finalSummaryView.js?v=20260711-scorecard-mobile"></script>
-  <script src="src/ui/previousRoundsView.js?v=20260710-gross-totals"></script>
+  <script src="src/ui/finalSummaryView.js?v=20260711-dnf"></script>
+  <script src="src/ui/previousRoundsView.js?v=20260711-dnf"></script>
   <script src="src/ui/playerManagementView.js?v=20260710-player-verification"></script>
   <script src="src/ui/groupSetupView.js?v=20260710-flex-hole-order"></script>
   <script src="src/ui/eventSummaryView.js?v=20260710-round-setup"></script>
-  <script src="src/app.js?v=20260711-scorecard-mobile"></script>
+  <script src="src/app.js?v=20260711-complete-score-truth"></script>
 </body>
 </html>

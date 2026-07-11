@@ -27,6 +27,10 @@ function getSkinsWinner(round) {
 }
 
 function formatPreviousGross(total) {
+  if (total.dnf) {
+    return `DNF - ${total.dnf.holesCompleted} holes - ${total.dnf.grossStrokes} strokes`;
+  }
+
   const holesPlayed = total.holesPlayed || 18;
   const grossText = holesPlayed >= 18
     ? `Gross ${total.gross}`

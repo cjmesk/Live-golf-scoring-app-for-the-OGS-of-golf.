@@ -277,6 +277,7 @@ body.is-scoring h1 {
 .round-screen.is-group-complete .hole-summary,
 .round-screen.is-group-complete .hole-players,
 .round-screen.is-group-complete .group-nav-row,
+.round-screen.is-group-complete .commissioner-override-panel,
 .round-screen.is-group-complete .action-row,
 .round-screen.is-group-complete #groupCompletionSummary {
   display: none;
@@ -528,8 +529,86 @@ body.is-scoring .current-hole-status {
 }
 
 .scorekeeper-player {
-  grid-template-columns: 1fr minmax(184px, 260px);
+  grid-template-columns: 1fr minmax(184px, 260px) 44px;
   align-items: center;
+  position: relative;
+}
+
+.scorekeeper-player.is-dnf-player {
+  grid-template-columns: 1fr auto;
+  background: #fafbf9;
+}
+
+.dnf-status {
+  color: var(--green-dark);
+  font-weight: 900;
+}
+
+.player-options-menu {
+  justify-self: end;
+}
+
+.player-options-menu summary {
+  display: grid;
+  place-items: center;
+  min-width: 76px;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--green-dark);
+  background: var(--paper);
+  font-size: 0.86rem;
+  font-weight: 900;
+  list-style: none;
+  padding: 0 10px;
+}
+
+.player-options-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.player-options-list {
+  display: grid;
+  gap: 8px;
+  min-width: 190px;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: 0 8px 18px rgba(23, 32, 27, 0.12);
+}
+
+.player-option-button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--green-dark);
+  background: #fafbf9;
+  font-weight: 800;
+  text-align: left;
+  padding: 0 10px;
+}
+
+.dnf-confirm-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  margin-bottom: 12px;
+}
+
+.dnf-confirm-panel p {
+  margin: 0;
+  font-weight: 800;
+}
+
+.dnf-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .hole-player-info {
@@ -675,7 +754,8 @@ body.is-scoring .current-hole-status {
   margin-top: 12px;
 }
 
-.group-nav-row {
+.group-nav-row,
+.commissioner-override-panel {
   display: grid;
   gap: 10px;
   align-items: center;
@@ -697,6 +777,53 @@ body.is-scoring .current-hole-status {
   color: var(--muted);
   font-size: 0.86rem;
   font-weight: 800;
+}
+
+.override-banner {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--blue);
+  border-radius: 8px;
+  background: #eef4fb;
+}
+
+.override-banner strong {
+  color: var(--blue);
+  font-size: 0.95rem;
+}
+
+.score-override-list {
+  display: grid;
+  gap: 8px;
+}
+
+.score-override-row {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-height: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--paper);
+  text-align: left;
+}
+
+.score-override-row strong {
+  color: var(--green-dark);
+}
+
+.score-override-row span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.score-override-row.is-active {
+  border-color: var(--green-dark);
+  background: #eef5ef;
 }
 
 .secondary-button {
@@ -1020,6 +1147,14 @@ body.is-scoring .current-hole-status {
 
   .scorekeeper-player {
     grid-template-columns: 1fr;
+  }
+
+  .player-options-menu {
+    justify-self: stretch;
+  }
+
+  .player-options-menu summary {
+    width: 100%;
   }
 
   .leaderboard-totals {

@@ -39,6 +39,10 @@ let groupHoleIndexes = [];
 let currentScorerId = scorerStorage.getScorerId();
 let commissionerMode = scorerStorage.isCommissioner();
 let viewOnlyMode = false;
+let pendingDnfPlayerId = null;
+let scoreOverrideOpen = false;
+let scoreOverrideActive = false;
+let scoreOverrideReturnGroupIndex = 0;
 
 function setActiveScreen(screenName) {
   const isScoringScreen = screenName === "round";
@@ -390,6 +394,10 @@ function setCommissionerMode(isOn) {
 
   if (isOn) {
     scorerStorage.clearScorerId();
+    scoreOverrideReturnGroupIndex = currentGroupIndex;
+  } else {
+    scoreOverrideOpen = false;
+    scoreOverrideActive = false;
   }
 
   scorerStorage.setCommissionerMode(isOn);
@@ -526,6 +534,65 @@ function showRosterCloudStatus(message) {
   elements.rosterCloudStatus.classList.toggle("is-hidden", !shouldShowRosterStatus);
 }
 
+function getGroupScorerName(groupIndex) {
+  const scorerId = roundSettings?.groupScorers?.[groupIndex]
+    || roundSettings?.groupRecords?.[groupIndex]?.scorekeeperId;
+  const scorer = selectedPlayers.find((player) => player.id === scorerId)
+    || members.find((member) => member.id === scorerId);
+
+  return scorer?.name || "Not assigned";
+}
+
+function getGroupDisplayStatus(groupIndex) {
+  const record = getGroupRecord(groupIndex);
+
+  if (isGroupComplete(groupIndex) || record.status === "completed") {
+    return "Completed";
+  }
+
+  return "In progress";
+}
+
+function renderScoreOverrideControls() {
+  if (!elements.commissionerGroupControls) return;
+
+  const shouldShow = Boolean(commissionerMode && roundState && roundSettings?.groups?.length);
+  elements.commissionerGroupControls.classList.toggle("is-hidden", !shouldShow);
+
+  if (!shouldShow) {
+    scoreOverrideOpen = false;
+    elements.scoreOverrideList?.classList.add("is-hidden");
+    elements.scoreOverrideBanner?.classList.add("is-hidden");
+    return;
+  }
+
+  elements.scoreOverrideBanner?.classList.toggle("is-hidden", !scoreOverrideActive);
+
+  if (elements.scoreOverrideBannerText) {
+    elements.scoreOverrideBannerText.textContent =
+      `Commissioner Override - Scoring Group ${currentGroupIndex + 1}`;
+  }
+
+  if (elements.scoreOverrideList) {
+    elements.scoreOverrideList.classList.toggle("is-hidden", !scoreOverrideOpen);
+    elements.scoreOverrideList.innerHTML = roundSettings.groups
+      .map((group, index) => {
+        const record = getGroupRecord(index);
+        const activeClass = index === currentGroupIndex ? " is-active" : "";
+
+        return `
+          <button type="button" class="score-override-row${activeClass}" data-override-group-index="${index}">
+            <strong>Group ${index + 1}</strong>
+            <span>Scorer: ${getGroupScorerName(index)}</span>
+            <span>Current hole: ${record.currentHole || 1}</span>
+            <span>Status: ${getGroupDisplayStatus(index)}</span>
+          </button>
+        `;
+      })
+      .join("");
+  }
+}
+
 function mergeRoster(localPlayers, cloudPlayers) {
   const mergedById = new Map();
 
@@ -584,11 +651,13 @@ async function loadRosterFromCloud({ manual = false } = {}) {
 function renderHoleStatus() {
   if (!roundState) return;
 
+  syncGroupCompletionFromScores(currentGroupIndex);
   const visibleGroups = commissionerMode
     ? roundSettings.groups.map((group, index) => ({ group, index }))
     : [{ group: roundSettings.groups[currentGroupIndex], index: currentGroupIndex }];
-  const canEdit = canEditCurrentGroup();
-  const groupComplete = isGroupComplete(currentGroupIndex);
+  const groupRecord = getGroupRecord(currentGroupIndex);
+  const groupComplete = groupRecord.status === "completed" || isGroupComplete(currentGroupIndex);
+  const canEdit = canEditCurrentGroup() && !groupComplete;
 
   elements.roundNameStatus.textContent = roundSettings.roundName || "OG's Golf";
   elements.courseNameStatus.textContent = roundSettings.course?.name || selectedCourse.name;
@@ -621,6 +690,7 @@ function renderHoleStatus() {
   elements.previousGroup.disabled = true;
   elements.nextGroup.disabled = true;
   elements.groupSwitcher.disabled = !commissionerMode;
+  renderScoreOverrideControls();
   elements.roundScreen.classList.toggle("is-group-complete", groupComplete);
   elements.saveHole.classList.toggle("is-hidden", groupComplete);
   elements.saveHole.disabled = !canEdit || groupComplete;
@@ -641,10 +711,11 @@ function renderHoleStatus() {
 }
 
 function renderCurrentHole() {
-  if (isGroupComplete(currentGroupIndex)) {
+  syncGroupCompletionFromScores(currentGroupIndex);
+  if (getGroupRecord(currentGroupIndex).status === "completed" || isGroupComplete(currentGroupIndex)) {
     syncRoundStateToCurrentGroup();
   } else {
-    renderHoleView(elements, selectedCourse, getCurrentGroupPlayers(), roundState);
+    renderHoleView(elements, selectedCourse, getCurrentGroupPlayers(), roundState, { commissionerMode });
   }
   renderHoleStatus();
 }
@@ -735,6 +806,42 @@ function markGroupHoleComplete(groupIndex, holeNumber) {
     : "in_progress";
 }
 
+function getGroupCompletedHoleNumbersFromScores(groupIndex) {
+  if (!roundState) return [];
+
+  const sequence = getGroupHoleSequence(groupIndex);
+  const activePlayers = getGroupPlayers(groupIndex)
+    .filter((player) => !roundState.isPlayerDnf(player));
+
+  return sequence.filter((holeNumber) =>
+    activePlayers.every((player) => {
+      const score = roundState.savedScores[player.id]?.[holeNumber - 1];
+      return Number.isFinite(Number(score)) && Number(score) > 0;
+    })
+  );
+}
+
+function syncGroupCompletionFromScores(groupIndex) {
+  const record = getGroupRecord(groupIndex);
+  const completedFromScores = getGroupCompletedHoleNumbersFromScores(groupIndex);
+
+  record.completedHoleNumbers = completedFromScores;
+
+  record.status = record.completedHoleNumbers.length >= record.holesToPlay
+    ? "completed"
+    : "in_progress";
+
+  return record;
+}
+
+function syncAllGroupCompletionsFromScores() {
+  if (!roundSettings?.groups?.length || !roundState) return;
+
+  roundSettings.groups.forEach((group, index) => {
+    syncGroupCompletionFromScores(index);
+  });
+}
+
 function getGroupGrossRows(groupIndex = currentGroupIndex) {
   const record = getGroupRecord(groupIndex);
   const sequence = getGroupHoleSequence(groupIndex);
@@ -791,8 +898,8 @@ function renderCompletedGroupPage() {
   const compactRows = rows.map((row) => `
     <div class="completed-gross-row">
       <strong>${row.player.name}</strong>
-      <span>${row.holes} holes</span>
-      <b>Gross ${row.gross}</b>
+      <span>${roundState.isPlayerDnf(row.player) ? roundState.formatDnfStatus(row.player) : `${row.holes} holes`}</span>
+      <b>${roundState.isPlayerDnf(row.player) ? "DNF" : `Gross ${row.gross}`}</b>
     </div>
   `).join("");
 
@@ -871,6 +978,62 @@ function showActiveRoundManagement() {
     "Commissioner Mode: use the main menu to manage the active round or select another group.";
 }
 
+function openDnfConfirmation(playerId) {
+  if (!roundState || !canEditCurrentGroup()) return;
+
+  const player = getCurrentGroupPlayers().find((item) => item.id === playerId);
+  if (!player || roundState.isPlayerDnf(player)) return;
+
+  const totals = roundState.getPlayerTotals(player);
+  pendingDnfPlayerId = playerId;
+  elements.dnfConfirmMessage.textContent =
+    `Mark ${player.name} as DNF after ${totals.holesPlayed} holes and ${totals.gross} strokes?`;
+  elements.dnfConfirmPanel.classList.remove("is-hidden");
+  elements.dnfConfirmPanel.scrollIntoView({ behavior: "auto", block: "center" });
+}
+
+function closeDnfConfirmation() {
+  pendingDnfPlayerId = null;
+  elements.dnfConfirmPanel.classList.add("is-hidden");
+  elements.dnfConfirmMessage.textContent = "";
+}
+
+async function confirmPlayerDnf() {
+  if (!pendingDnfPlayerId || !roundState || !canEditCurrentGroup()) return;
+
+  const status = roundState.markPlayerDnf(pendingDnfPlayerId);
+  const player = getCurrentGroupPlayers().find((item) => item.id === pendingDnfPlayerId);
+  closeDnfConfirmation();
+
+  if (!status || !player) return;
+
+  await autoSaveUnfinishedRound(currentGroupIndex, roundState.currentHoleIndex);
+  renderApp();
+  elements.saveStatusMessage.textContent =
+    `${player.name}: DNF - ${status.holesCompleted} holes - ${status.grossStrokes} strokes`;
+}
+
+async function restorePlayerToActive(playerId) {
+  if (!commissionerMode || !roundState) return;
+
+  const player = getCurrentGroupPlayers().find((item) => item.id === playerId);
+  if (!player) return;
+
+  roundState.restorePlayerActive(playerId);
+  const missingHole = getGroupHoleSequence(currentGroupIndex)
+    .find((holeNumber) => roundState.savedScores[playerId]?.[holeNumber - 1] === null);
+
+  if (missingHole) {
+    const record = getGroupRecord(currentGroupIndex);
+    record.status = "in_progress";
+    setCurrentHoleForGroup(currentGroupIndex, missingHole);
+  }
+
+  await autoSaveUnfinishedRound(currentGroupIndex, roundState.currentHoleIndex);
+  renderApp();
+  elements.saveStatusMessage.textContent = `${player.name} restored to active scoring.`;
+}
+
 function getNextUncompletedHole(groupIndex) {
   const record = getGroupRecord(groupIndex);
   const completed = new Set(record.completedHoleNumbers || []);
@@ -880,8 +1043,19 @@ function getNextUncompletedHole(groupIndex) {
 function isGroupComplete(groupIndex) {
   if (!roundState || !roundSettings?.groups?.[groupIndex]) return false;
 
-  const record = getGroupRecord(groupIndex);
-  return record.status === "completed" || record.completedHoleNumbers.length >= record.holesToPlay;
+  const record = syncGroupCompletionFromScores(groupIndex);
+  const sequence = getGroupHoleSequence(groupIndex);
+  const activePlayersHaveScores = getGroupPlayers(groupIndex)
+    .filter((player) => !roundState.isPlayerDnf(player))
+    .every((player) =>
+      sequence.every((holeNumber) => {
+        const score = roundState.savedScores[player.id]?.[holeNumber - 1];
+        return Number.isFinite(Number(score)) && Number(score) > 0;
+      })
+    );
+
+  return (record.status === "completed" || record.completedHoleNumbers.length >= record.holesToPlay)
+    && activePlayersHaveScores;
 }
 
 function getNextOpenGroupIndex(startingIndex) {
@@ -919,6 +1093,33 @@ function goToGroup(nextGroupIndex) {
   syncRoundStateToCurrentGroup();
   renderApp();
   scrollToScoring();
+}
+
+function enterScoreOverride(groupIndex) {
+  if (!commissionerMode || !roundSettings?.groups?.length) return;
+
+  const targetGroupIndex = Math.max(0, Math.min(roundSettings.groups.length - 1, groupIndex));
+
+  if (!scoreOverrideActive) {
+    scoreOverrideReturnGroupIndex = currentGroupIndex;
+  }
+
+  scoreOverrideActive = targetGroupIndex !== scoreOverrideReturnGroupIndex;
+  scoreOverrideOpen = false;
+  goToGroup(targetGroupIndex);
+}
+
+function exitScoreOverride() {
+  if (!commissionerMode || !roundSettings?.groups?.length) return;
+
+  const returnIndex = Math.max(
+    0,
+    Math.min(roundSettings.groups.length - 1, scoreOverrideReturnGroupIndex)
+  );
+
+  scoreOverrideActive = false;
+  scoreOverrideOpen = false;
+  goToGroup(returnIndex);
 }
 
 function goToHoleForCurrentGroup(nextHoleIndex) {
@@ -973,6 +1174,7 @@ function getPlayerGroupIndex(playerId) {
 
 function canEditCurrentGroup() {
   if (!roundState) return false;
+  if (roundSettings?.groupRecords?.[currentGroupIndex]?.status === "completed") return false;
   if (commissionerMode) return true;
   if (viewOnlyMode) return false;
   return Boolean(currentScorerId && roundSettings?.groupScorers?.[currentGroupIndex] === currentScorerId);
@@ -1134,12 +1336,14 @@ function mergeActiveRound(localRound, cloudRound, savedGroupIndex, savedHoleInde
     roundSettings: {
       ...(cloudRound.roundSettings || {}),
       ...(localRound.roundSettings || {}),
+      playerStatuses: localRound.roundSettings?.playerStatuses || cloudRound.roundSettings?.playerStatuses || {},
       groupRecords: localRound.roundSettings?.groupRecords || cloudRound.roundSettings?.groupRecords || []
     },
     currentGroupIndex: localRound.currentGroupIndex,
     currentHoleIndex: localRound.currentHoleIndex,
     currentHole: localRound.currentHole,
     groupHoleIndexes: [...(cloudRound.groupHoleIndexes || localRound.groupHoleIndexes || [])],
+    playerStatuses: localRound.playerStatuses || cloudRound.playerStatuses || {},
     savedScores: {
       ...(cloudRound.savedScores || {})
     },
@@ -1651,6 +1855,7 @@ function loadSavedRoundIntoState(savedRound) {
   groupHoleIndexes = savedRound.groupHoleIndexes || roundSettings.groups.map((group, index) =>
     Math.max(0, (getGroupRecord(index).currentHole || savedRound.currentHole || 1) - 1)
   );
+  syncAllGroupCompletionsFromScores();
 
   if (!commissionerMode && currentScorerId) {
     currentGroupIndex = getAssignedGroupIndex(currentScorerId);
@@ -1789,6 +1994,19 @@ elements.holePlayers.addEventListener("click", (event) => {
   if (!roundState) return;
   if (!canEditCurrentGroup()) return;
 
+  const dnfButton = event.target.closest("[data-dnf-player-id]");
+  const restoreButton = event.target.closest("[data-restore-player-id]");
+
+  if (dnfButton) {
+    openDnfConfirmation(dnfButton.dataset.dnfPlayerId);
+    return;
+  }
+
+  if (restoreButton) {
+    restorePlayerToActive(restoreButton.dataset.restorePlayerId);
+    return;
+  }
+
   const button = event.target.closest("button[data-player-id]");
 
   if (!button) return;
@@ -1797,6 +2015,8 @@ elements.holePlayers.addEventListener("click", (event) => {
   roundState.changeDraftScore(button.dataset.playerId, amount);
   renderCurrentHole();
 });
+elements.cancelDnf.addEventListener("click", closeDnfConfirmation);
+elements.confirmDnf.addEventListener("click", confirmPlayerDnf);
 
 elements.previousHole.addEventListener("click", () => {
   if (!roundState) return;
@@ -1833,6 +2053,23 @@ elements.groupSwitcher.addEventListener("change", () => {
   goToGroup(Number(elements.groupSwitcher.value));
 });
 
+elements.toggleScoreOverride.addEventListener("click", () => {
+  if (!commissionerMode || !roundState) return;
+
+  scoreOverrideOpen = !scoreOverrideOpen;
+  renderScoreOverrideControls();
+});
+
+elements.scoreOverrideList.addEventListener("click", (event) => {
+  const groupButton = event.target.closest("[data-override-group-index]");
+
+  if (!groupButton) return;
+
+  enterScoreOverride(Number(groupButton.dataset.overrideGroupIndex));
+});
+
+elements.exitScoreOverride.addEventListener("click", exitScoreOverride);
+
 elements.holeSelector.addEventListener("change", () => {
   if (!roundState) return;
   if (!canEditCurrentGroup()) return;
@@ -1848,7 +2085,8 @@ elements.saveHole.addEventListener("click", async () => {
 
   syncRoundStateToCurrentGroup();
   const groupPlayers = getCurrentGroupPlayers();
-  const hasInvalidScore = groupPlayers.some((player) => {
+  const playersToScore = groupPlayers.filter((player) => !roundState.isPlayerDnf(player));
+  const hasInvalidScore = playersToScore.some((player) => {
     const score = roundState.draftScores[player.id];
     return !Number.isFinite(Number(score)) || Number(score) < 1;
   });
@@ -1863,7 +2101,7 @@ elements.saveHole.addEventListener("click", async () => {
   const savedGroupIndex = currentGroupIndex;
 
   try {
-    roundState.saveCurrentHole(groupPlayers);
+    roundState.saveCurrentHole(playersToScore);
   } catch (error) {
     elements.saveStatusMessage.textContent = "Save failed. Scores were not advanced.";
     return;

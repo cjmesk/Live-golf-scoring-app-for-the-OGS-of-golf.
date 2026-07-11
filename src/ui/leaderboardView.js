@@ -3,6 +3,7 @@ window.OGSGolf.ui = window.OGSGolf.ui || {};
 
 window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, players, roundState) {
   const pointsEnabled = roundState.roundSettings.games.pointsGame.enabled;
+  const totalHoles = roundState.totalHoles || 18;
   const standings = players
     .map((player) => ({
       player,
@@ -29,6 +30,8 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
 
   standings.forEach((standing, index) => {
     const { player, totals } = standing;
+    const isDnf = roundState.isPlayerDnf(player);
+    const dnfText = roundState.formatDnfStatus(player);
     const frontPointsResult = roundState.getPointsDifferential(player, "front");
     const backPointsResult = roundState.getPointsDifferential(player, "back");
     const overallPointsResult = standing.pointsResult;
@@ -48,18 +51,19 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
       <div>
         <div class="player-name">${player.name}</div>
         <div class="player-details">Index ${player.handicap} | Course Handicap ${roundState.courseHandicaps[player.id]} | ${player.tee} tees</div>
-        <div class="player-details">${totals.holesPlayed}/18 holes saved</div>
+        <div class="player-details">${isDnf ? dnfText : `${totals.holesPlayed}/${totalHoles} holes saved`}</div>
         <div class="player-details">${gameStatus}</div>
       </div>
       <div class="leaderboard-totals">
-        ${pointsEnabled && roundState.isInPoints(player) ? `<span class="points">${overallPointsResult.display}</span>` : ""}
-        ${pointsEnabled && !roundState.isInPoints(player) ? `<span class="gross">Not in Points</span>` : ""}
-        ${pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">Quota ${frontPointsResult.quota} per side / ${overallPointsResult.target} overall</span>` : ""}
-        ${pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">${totals.points} pts earned</span>` : ""}
-        ${pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">Front ${frontPointsResult.display} | Back ${backPointsResult.display}</span>` : ""}
+        ${isDnf ? `<span class="points">DNF</span>` : ""}
+        ${!isDnf && pointsEnabled && roundState.isInPoints(player) ? `<span class="points">${overallPointsResult.display}</span>` : ""}
+        ${!isDnf && pointsEnabled && !roundState.isInPoints(player) ? `<span class="gross">Not in Points</span>` : ""}
+        ${!isDnf && pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">Quota ${frontPointsResult.quota} per side / ${overallPointsResult.target} overall</span>` : ""}
+        ${!isDnf && pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">${totals.points} pts earned</span>` : ""}
+        ${!isDnf && pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">Front ${frontPointsResult.display} | Back ${backPointsResult.display}</span>` : ""}
         <span class="gross">${overallGrossText}</span>
         <span class="gross">${frontGrossText} | ${backGrossText}</span>
-        <span class="gross">Net ${totals.net || "-"}</span>
+        <span class="gross">${isDnf ? "Excluded from full-round results" : `Net ${totals.net || "-"}`}</span>
       </div>
     `;
     elements.leaderboard.appendChild(row);

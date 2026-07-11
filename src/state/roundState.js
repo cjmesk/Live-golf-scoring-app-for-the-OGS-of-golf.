@@ -22,6 +22,10 @@ window.OGSGolf.state.createRoundState = function createRoundState(
   let savedHoleResults = savedRound?.savedHoleResults || Array(totalHoles).fill(null);
   let skinResults = savedRound?.skinResults || Array(totalHoles).fill(null);
   let currentHoleIndex = savedRound?.currentHoleIndex || 0;
+  const playerStatuses = {
+    ...(roundSettings.playerStatuses || {}),
+    ...(savedRound?.playerStatuses || {})
+  };
 
   players.forEach((player) => {
     savedScores[player.id] = savedRound?.savedScores?.[player.id] || Array(totalHoles).fill(null);
@@ -37,11 +41,26 @@ window.OGSGolf.state.createRoundState = function createRoundState(
   }
 
   function getSkinsPlayers() {
-    return players.filter(isInSkins);
+    return players.filter((player) => isInSkins(player) && !isPlayerDnf(player));
   }
 
   function getPointsPlayers() {
-    return players.filter(isInPoints);
+    return players.filter((player) => isInPoints(player) && !isPlayerDnf(player));
+  }
+
+  function isPlayerDnf(player) {
+    return playerStatuses[player.id]?.status === "dnf";
+  }
+
+  function getPlayerDnfStatus(player) {
+    return playerStatuses[player.id] || null;
+  }
+
+  function formatDnfStatus(player) {
+    const status = getPlayerDnfStatus(player);
+    return status?.status === "dnf"
+      ? `DNF - ${status.holesCompleted} holes - ${status.grossStrokes} strokes`
+      : "";
   }
 
   function formatPointsNumber(value) {
@@ -154,6 +173,19 @@ window.OGSGolf.state.createRoundState = function createRoundState(
   }
 
   function getPointsDifferential(player, section = "overall") {
+    if (isPlayerDnf(player)) {
+      return {
+        points: 0,
+        target: 0,
+        quota: getPointsQuota(player),
+        holesPlayed: getPlayerTotals(player).holesPlayed,
+        holesNeeded: section === "overall" ? 18 : 9,
+        isComplete: false,
+        differential: Number.NEGATIVE_INFINITY,
+        display: formatDnfStatus(player)
+      };
+    }
+
     const totals = getPlayerTotals(player);
     const target = {
       front: totals.frontPointsTarget,
@@ -225,9 +257,14 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     return players
       .map((player) => ({
         player,
-        totals: getPlayerTotals(player)
+        totals: getPlayerTotals(player),
+        dnf: isPlayerDnf(player)
       }))
       .sort((a, b) => {
+        if (a.dnf !== b.dnf) {
+          return a.dnf ? 1 : -1;
+        }
+
         const aPointsResult = getPointsDifferential(a.player, "overall");
         const bPointsResult = getPointsDifferential(b.player, "overall");
 
@@ -244,7 +281,16 @@ window.OGSGolf.state.createRoundState = function createRoundState(
   }
 
   function getLowestScoreLeaders(scoreKey) {
-    const totals = players.map((player) => ({
+    const eligiblePlayers = players.filter((player) => !isPlayerDnf(player));
+
+    if (eligiblePlayers.length === 0) {
+      return {
+        score: "-",
+        leaders: []
+      };
+    }
+
+    const totals = eligiblePlayers.map((player) => ({
       player,
       score: getPlayerTotals(player)[scoreKey]
     }));
@@ -267,7 +313,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
 
         return {
           player,
-          points: grossScore === null || !isInPoints(player) ? 0 : getPoints(grossScore, par)
+          points: grossScore === null || !isInPoints(player) || isPlayerDnf(player) ? 0 : getPoints(grossScore, par)
         };
       });
   }
@@ -340,7 +386,9 @@ window.OGSGolf.state.createRoundState = function createRoundState(
   }
 
   function isRoundComplete() {
-    return players.every((player) => savedScores[player.id].every((score) => score !== null));
+    return players.every((player) =>
+      isPlayerDnf(player) || savedScores[player.id].every((score) => score !== null)
+    );
   }
 
   function getLastSavedHoleIndex() {
@@ -372,6 +420,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       playerTotals: players.map((player) => ({
         player,
         totals: getPlayerTotals(player),
+        dnf: getPlayerDnfStatus(player),
         skins: getSkinSummary()[player.id] || {
           player,
           totalSkins: 0,
@@ -424,7 +473,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
           strokesReceived: result?.strokesReceived ?? 0,
           net: result?.netScore ?? null,
           skinScore: result?.skinScore ?? null,
-          points: savedScores[player.id][holeIndex] === null || !isInPoints(player)
+          points: savedScores[player.id][holeIndex] === null || !isInPoints(player) || isPlayerDnf(player)
             ? 0
             : getPoints(savedScores[player.id][holeIndex], hole.par)
         };
@@ -457,12 +506,14 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         inLongDrive: player.inLongDrive !== false,
         inTeamChallenge: player.inTeamChallenge === true,
         teamId: player.teamId || "",
-        courseHandicap: courseHandicaps[player.id]
+        courseHandicap: courseHandicaps[player.id],
+        dnf: getPlayerDnfStatus(player)
       })),
       holeByHole,
       savedScores,
       savedHoleResults,
       skinResults,
+      playerStatuses,
       teamChallenge: {
         enabled: roundSettings.games.teamChallenge?.enabled === true,
         teams: teamChallengeTeams.map((team) => ({
@@ -495,7 +546,8 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         backPointsResult: getPointsDifferential(item.player, "back").display,
         overallPointsResult: getPointsDifferential(item.player, "overall").display,
         skinsWon: item.skins.totalSkins,
-        skinHoles: item.skins.holesWon
+        skinHoles: item.skins.holesWon,
+        dnf: item.dnf
       })),
       winners: {
         gross: finalSummary.grossWinner,
@@ -536,7 +588,8 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         overallPointsTarget: playerTotals.overallPointsTarget,
         frontPointsResult: getPointsDifferential(player, "front").display,
         backPointsResult: getPointsDifferential(player, "back").display,
-        overallPointsResult: getPointsDifferential(player, "overall").display
+        overallPointsResult: getPointsDifferential(player, "overall").display,
+        dnf: getPlayerDnfStatus(player)
       };
     });
 
@@ -566,11 +619,13 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         inLongDrive: player.inLongDrive !== false,
         inTeamChallenge: player.inTeamChallenge === true,
         teamId: player.teamId || "",
-        courseHandicap: courseHandicaps[player.id]
+        courseHandicap: courseHandicaps[player.id],
+        dnf: getPlayerDnfStatus(player)
       })),
       savedScores,
       savedHoleResults,
       skinResults,
+      playerStatuses,
       teamChallenge: {
         enabled: roundSettings.games.teamChallenge?.enabled === true,
         teams: getTeamChallengeTeams().map((team) => ({
@@ -593,12 +648,13 @@ window.OGSGolf.state.createRoundState = function createRoundState(
 
   function saveCurrentHole(playersToSave = players) {
     const existingHoleResults = savedHoleResults[currentHoleIndex] || [];
-    const playerIdsToSave = new Set(playersToSave.map((player) => player.id));
+    const activePlayersToSave = playersToSave.filter((player) => !isPlayerDnf(player));
+    const playerIdsToSave = new Set(activePlayersToSave.map((player) => player.id));
     const holeResults = existingHoleResults.filter(
       (result) => !playerIdsToSave.has(result.playerId)
     );
 
-    playersToSave.forEach((player) => {
+    activePlayersToSave.forEach((player) => {
       const grossScore = draftScores[player.id];
       const strokesReceived = getStrokesForPlayerOnHole(player);
       const netScore = getNetScore(grossScore, strokesReceived);
@@ -649,7 +705,31 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     savedHoleResults = Array(totalHoles).fill(null);
     skinResults = Array(totalHoles).fill(null);
     currentHoleIndex = 0;
+    Object.keys(playerStatuses).forEach((playerId) => {
+      delete playerStatuses[playerId];
+    });
+    roundSettings.playerStatuses = playerStatuses;
     loadDraftScores();
+  }
+
+  function markPlayerDnf(playerId) {
+    const player = players.find((item) => item.id === playerId);
+    if (!player) return null;
+
+    const totals = getPlayerTotals(player);
+    playerStatuses[playerId] = {
+      status: "dnf",
+      holesCompleted: totals.holesPlayed,
+      grossStrokes: totals.gross,
+      markedAt: new Date().toISOString()
+    };
+    roundSettings.playerStatuses = playerStatuses;
+    return playerStatuses[playerId];
+  }
+
+  function restorePlayerActive(playerId) {
+    delete playerStatuses[playerId];
+    roundSettings.playerStatuses = playerStatuses;
   }
 
   recalculateSkins();
@@ -662,6 +742,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     savedScores,
     courseHandicaps,
     draftScores,
+    playerStatuses,
     get currentHoleIndex() {
       return currentHoleIndex;
     },
@@ -673,6 +754,8 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     getHolePointsResults,
     getSkinForHole,
     getPlayerTotals,
+    getPlayerDnfStatus,
+    formatDnfStatus,
     formatGrossTotal,
     getPointsQuota,
     getPointsDifferential,
@@ -683,6 +766,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     getTeamChallengeTeams,
     isInSkins,
     isInPoints,
+    isPlayerDnf,
     isRoundComplete,
     getLastSavedHoleIndex,
     getLastSavedHoleIndexForPlayers,
@@ -691,6 +775,8 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     getAutoSaveExport,
     changeDraftScore,
     saveCurrentHole,
+    markPlayerDnf,
+    restorePlayerActive,
     clearHoleForPlayers,
     goToHole,
     resetScores

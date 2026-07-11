@@ -1,7 +1,7 @@
 window.OGSGolf = window.OGSGolf || {};
 window.OGSGolf.ui = window.OGSGolf.ui || {};
 
-window.OGSGolf.ui.renderHoleView = function renderHoleView(elements, course, players, roundState) {
+window.OGSGolf.ui.renderHoleView = function renderHoleView(elements, course, players, roundState, options = {}) {
   const currentHoleIndex = roundState.currentHoleIndex;
   const firstPlayer = players[0];
   const currentHole = firstPlayer
@@ -20,17 +20,35 @@ window.OGSGolf.ui.renderHoleView = function renderHoleView(elements, course, pla
 
   players.forEach((player) => {
     const score = roundState.draftScores[player.id];
+    const dnfStatus = roundState.getPlayerDnfStatus(player);
+    const isDnf = Boolean(dnfStatus);
+    const playerOptions = isDnf
+      ? options.commissionerMode
+        ? `<button type="button" class="player-option-button" data-restore-player-id="${player.id}">Restore Player to Active</button>`
+        : ""
+      : `<button type="button" class="player-option-button" data-dnf-player-id="${player.id}">End Player Round - DNF</button>`;
     const playerRow = document.createElement("article");
-    playerRow.className = "hole-player scorekeeper-player";
+    playerRow.className = `hole-player scorekeeper-player${isDnf ? " is-dnf-player" : ""}`;
     playerRow.innerHTML = `
       <div class="hole-player-info">
         <div class="player-name">${player.name}</div>
+        ${isDnf ? `<div class="player-details dnf-status">${roundState.formatDnfStatus(player)}</div>` : ""}
       </div>
-      <div class="score-stepper" aria-label="${player.name} gross score controls">
-        <button type="button" class="step-button" data-action="decrease" data-player-id="${player.id}" aria-label="Decrease ${player.name} score">-</button>
-        <output class="score-value" id="${player.id}-score">${score}</output>
-        <button type="button" class="step-button" data-action="increase" data-player-id="${player.id}" aria-label="Increase ${player.name} score">+</button>
-      </div>
+      ${isDnf ? "" : `
+        <div class="score-stepper" aria-label="${player.name} gross score controls">
+          <button type="button" class="step-button" data-action="decrease" data-player-id="${player.id}" aria-label="Decrease ${player.name} score">-</button>
+          <output class="score-value" id="${player.id}-score">${score}</output>
+          <button type="button" class="step-button" data-action="increase" data-player-id="${player.id}" aria-label="Increase ${player.name} score">+</button>
+        </div>
+      `}
+      ${playerOptions ? `
+        <details class="player-options-menu">
+          <summary aria-label="${player.name} player options">Options</summary>
+          <div class="player-options-list">
+            ${playerOptions}
+          </div>
+        </details>
+      ` : ""}
     `;
 
     elements.holePlayers.appendChild(playerRow);

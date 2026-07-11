@@ -5,6 +5,16 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
   const summary = roundState.getFinalSummary();
 
   function formatWinner(result, label) {
+    if (!result.leaders.length) {
+      return `
+        <div class="summary-card">
+          <span>${label}</span>
+          <strong>No eligible players</strong>
+          <small>DNF players excluded</small>
+        </div>
+      `;
+    }
+
     const names = result.leaders.map((item) => item.player.name).join(", ");
     return `
       <div class="summary-card">
@@ -52,6 +62,7 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
 
   const totalRows = summary.playerTotals
     .map((item) => {
+      const dnfText = item.dnf ? `DNF - ${item.dnf.holesCompleted} holes - ${item.dnf.grossStrokes} strokes` : "";
       const frontGrossText = roundState.formatGrossTotal(item.totals, "front");
       const backGrossText = roundState.formatGrossTotal(item.totals, "back");
       const overallGrossText = roundState.formatGrossTotal(item.totals, "overall");
@@ -59,9 +70,9 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
       return `
         <div class="summary-row">
           <span>${item.player.name}</span>
-          <strong>${overallGrossText}</strong>
+          <strong>${item.dnf ? "DNF" : overallGrossText}</strong>
           <small>${frontGrossText} | ${backGrossText}</small>
-          <small>${roundState.isInPoints(item.player) ? `Points ${roundState.getPointsDifferential(item.player, "overall").display} (${item.totals.points}/${item.totals.overallPointsTarget})` : "Not in Points"} | Net ${item.totals.net}</small>
+          <small>${item.dnf ? dnfText : `${roundState.isInPoints(item.player) ? `Points ${roundState.getPointsDifferential(item.player, "overall").display} (${item.totals.points}/${item.totals.overallPointsTarget})` : "Not in Points"} | Net ${item.totals.net}`}</small>
         </div>
       `;
     })
@@ -159,7 +170,10 @@ window.OGSGolf.ui.renderCompletedScorecard = function renderCompletedScorecard(e
   const backRow = players.map((player) => `<td>${getTotal(player, 9, 17)}</td>`).join("");
   const totalRow = players.map((player) => `<td>${getTotal(player, 0, roundState.totalHoles - 1)}</td>`).join("");
   const legend = playerLabels
-    .map(({ label, player }) => `<span><strong>${label}</strong> ${player.name}</span>`)
+    .map(({ label, player }) => {
+      const dnfText = roundState.formatDnfStatus(player);
+      return `<span><strong>${label}</strong> ${player.name}${dnfText ? ` (${dnfText})` : ""}</span>`;
+    })
     .join("");
 
   elements.finalSummary.innerHTML = `
