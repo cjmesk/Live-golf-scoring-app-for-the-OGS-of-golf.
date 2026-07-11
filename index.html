@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OG&apos;s Golf</title>
-  <link rel="stylesheet" href="src/styles/main.css?v=20260710-role-entry">
+  <link rel="stylesheet" href="src/styles/main.css?v=20260710-scorekeeper-group-lock">
 </head>
 <body>
   <header class="app-header">
@@ -26,6 +26,8 @@
     <button type="button" data-menu-action="editSetup" class="admin-only">Edit Round Setup</button>
     <button type="button" data-menu-action="scoring">Live Scoring</button>
     <button type="button" data-menu-action="leaderboard">Leaderboard</button>
+    <button type="button" data-menu-action="courseInfo">Course Information</button>
+    <button type="button" data-menu-action="handicapVerify" class="admin-only">Course Handicap Verification</button>
     <button type="button" data-menu-action="players" class="admin-only">Player Management</button>
     <button type="button" data-menu-action="courses" class="admin-only">Course Management</button>
     <button type="button" data-menu-action="bets" class="admin-only">Bet Settings</button>
@@ -124,19 +126,23 @@
     <section id="setupScreen" class="setup-section is-hidden" aria-labelledby="setupTitle">
       <div class="setup-header">
         <div>
-          <p class="eyebrow dark">Morning Setup Wizard</p>
-          <h2 id="setupTitle">Start a Round</h2>
+          <p class="eyebrow dark">Round Setup</p>
+          <h2 id="setupTitle">Step 1: Date and Course</h2>
         </div>
       </div>
 
       <div class="setup-panel">
-        <strong>Step 1: Course</strong>
+        <strong>Round details</strong>
         <label class="field-label" for="courseSelect">Course</label>
         <select id="courseSelect" class="field-control"></select>
+        <label class="field-label" for="roundDate">Date</label>
+        <input id="roundDate" class="field-control" type="date">
+        <label class="field-label" for="roundName">Round name, optional</label>
+        <input id="roundName" class="field-control" type="text" placeholder="Twelve Stones Golf Club - 2026-07-10">
       </div>
 
       <div class="setup-panel">
-        <h3>Step 1: Who is playing today?</h3>
+        <h3>Step 2: Select Players</h3>
         <div class="setup-tools">
           <input id="memberSearch" class="field-control" type="search" placeholder="Search roster">
           <span id="selectedPlayerCount" class="player-details">0 selected</span>
@@ -144,7 +150,7 @@
         <div id="memberList" class="member-list"></div>
       </div>
 
-      <div class="setup-panel">
+      <div class="setup-panel is-hidden">
         <h3>Step 2: What games are being played?</h3>
         <div id="gameList" class="game-list"></div>
       </div>
@@ -155,7 +161,7 @@
         <div id="teamAssignmentList" class="member-list"></div>
       </div>
 
-      <button id="startRound" type="button" class="save-button start-button">Continue to Groups</button>
+      <button id="startRound" type="button" class="save-button start-button">Next</button>
     </section>
 
     <section id="groupSetupScreen" class="group-setup-section is-hidden" aria-labelledby="groupSetupTitle">
@@ -168,7 +174,11 @@
 
       <div class="setup-panel">
         <strong id="groupSetupCount">0 players</strong>
-        <span class="player-details">For tomorrow: two groups of four, one scorer per cart. Everyone stays in one shared event.</span>
+        <span class="player-details">Assign each selected player to exactly one group. Every group starts on Hole 1.</span>
+        <div class="setup-tools">
+          <button id="removeGroup" type="button" class="secondary-button">Remove Group</button>
+          <button id="addGroup" type="button" class="secondary-button">Add Group</button>
+        </div>
       </div>
 
       <div id="groupSetupList" class="member-list"></div>
@@ -176,7 +186,7 @@
 
       <div class="group-setup-actions">
         <button id="backToRoundSetup" type="button" class="secondary-button">Back to Round Setup</button>
-        <button id="beginGroupedRound" type="button" class="save-button">Review Event Summary</button>
+        <button id="beginGroupedRound" type="button" class="save-button">Next</button>
       </div>
       <div id="groupSetupStatus" class="cloud-save-status"></div>
     </section>
@@ -198,13 +208,24 @@
     </section>
 
     <div id="roundScreen" class="round-screen is-hidden">
+      <nav class="score-nav" aria-label="Round navigation">
+        <button id="scoreMyGroup" type="button" class="secondary-button">Score My Group</button>
+        <button id="viewOverallLeaderboard" type="button" class="secondary-button">Leaderboard</button>
+      </nav>
+
       <section class="hole-section" aria-labelledby="holeTitle">
       <div class="round-status-bar">
-        <span id="currentHoleStatus" class="current-hole-status">Current Hole: 1 of 18</span>
+        <span id="roundNameStatus" class="current-hole-status">Round</span>
+        <span id="courseNameStatus" class="player-details">Course</span>
+        <span id="commissionerViewBadge" class="commissioner-view-badge is-hidden">Commissioner View</span>
+        <span id="currentGroupStatus" class="current-hole-status">Group 1</span>
+        <span id="currentHoleStatus" class="current-hole-status">Hole 1 of 18</span>
+        <label class="hole-selector-label" for="holeSelector">
+          Current Hole
+          <select id="holeSelector" class="field-control"></select>
+        </label>
         <span id="saveStatusMessage" class="save-status-message"></span>
       </div>
-
-      <div id="holePlayers" class="hole-players"></div>
 
       <div class="hole-summary">
         <div>
@@ -214,10 +235,12 @@
         <div id="holeDetails" class="hole-details"></div>
       </div>
 
-      <div class="group-nav-row">
+      <div id="holePlayers" class="hole-players"></div>
+
+      <div id="commissionerGroupControls" class="group-nav-row is-hidden">
         <button id="previousGroup" type="button" class="secondary-button">Previous Group</button>
         <label class="group-switcher-label">
-          <span id="currentGroupStatus" class="current-hole-status">Group 1 of 1</span>
+          <span>Commissioner Group Selector</span>
           <select id="groupSwitcher" class="field-control"></select>
         </label>
         <button id="nextGroup" type="button" class="secondary-button">Next Group</button>
@@ -225,9 +248,27 @@
 
       <div class="action-row">
         <button id="previousHole" type="button" class="secondary-button">Previous Hole</button>
-        <button id="saveHole" type="button" class="save-button">Save &amp; Next &rarr;</button>
+        <button id="saveHole" type="button" class="save-button">Save Hole</button>
         <button id="nextHole" type="button" class="secondary-button">Next Hole</button>
         <button id="undoLastHole" type="button" class="secondary-button">Undo Last Hole</button>
+      </div>
+      <div id="groupCompletionSummary" class="cloud-save-status is-hidden"></div>
+      <div id="completedGroupPanel" class="completed-group-panel is-hidden">
+        <div class="setup-header">
+          <div>
+            <p class="eyebrow dark">Group Round Complete</p>
+            <h2 id="completedGroupTitle">Group Complete</h2>
+          </div>
+        </div>
+        <p id="completedGroupMessage" class="completed-message"></p>
+        <div id="completedGroupGrossSummary" class="course-table-wrap"></div>
+        <p id="completedGroupStatus" class="cloud-save-status"></p>
+        <div class="completed-group-actions">
+          <button id="completedViewLeaderboard" type="button" class="secondary-button">View Leaderboard</button>
+          <button id="reviewGroupScores" type="button" class="secondary-button">Review My Group Scores</button>
+          <button id="activeRoundManagement" type="button" class="secondary-button admin-only">Active Round Management</button>
+        </div>
+        <div id="groupScoreReview" class="group-score-review is-hidden"></div>
       </div>
       </section>
 
@@ -236,7 +277,7 @@
         <div id="roundSettingsSummary" class="round-settings-summary"></div>
         <div class="scorer-actions">
           <button id="changeScorer" type="button" class="secondary-button">Change Player</button>
-          <button id="viewOverallLeaderboard" type="button" class="secondary-button">View Overall Leaderboard</button>
+          <button id="changeScorerLeaderboard" type="button" class="secondary-button">View Overall Leaderboard</button>
         </div>
       </section>
 
@@ -342,6 +383,7 @@
 
       <div class="player-management-actions">
         <button id="loadRosterCloud" type="button" class="secondary-button">Load Roster from Supabase</button>
+        <button id="exportRosterBackup" type="button" class="secondary-button">Export Roster Backup</button>
         <button id="saveRosterCloud" type="button" class="save-button">Save Roster to Supabase</button>
         <button id="backFromPlayerManagement" type="button" class="secondary-button">Back</button>
       </div>
@@ -361,6 +403,41 @@
         <strong>Twelve Stones Golf Club</strong>
         <span class="player-details">Course tee data is stored in the app. Full course editing is planned for a later beta.</span>
       </div>
+    </section>
+
+    <section id="courseInfoScreen" class="setup-section is-hidden" aria-labelledby="courseInfoTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">Verification</p>
+          <h2 id="courseInfoTitle">Course Information</h2>
+        </div>
+      </div>
+      <div id="courseInfoContent" class="course-info-content"></div>
+    </section>
+
+    <section id="handicapVerifyScreen" class="setup-section is-hidden" aria-labelledby="handicapVerifyTitle">
+      <div class="setup-header">
+        <div>
+          <p class="eyebrow dark">Commissioner Verification</p>
+          <h2 id="handicapVerifyTitle">Course Handicap Check</h2>
+        </div>
+      </div>
+
+      <div class="setup-panel">
+        <span class="player-details">Read-only check. This verifies the Course Handicap formula before we use it in scoring.</span>
+
+        <label class="field-label" for="handicapVerifyPlayer">Player</label>
+        <select id="handicapVerifyPlayer" class="field-control"></select>
+
+        <label class="field-label" for="handicapVerifyCourse">Course</label>
+        <select id="handicapVerifyCourse" class="field-control"></select>
+
+        <label class="field-label" for="handicapVerifyTee">Tee</label>
+        <select id="handicapVerifyTee" class="field-control"></select>
+      </div>
+
+      <div id="handicapVerifyResult" class="setup-panel"></div>
+      <div id="handicapVerifyExamples" class="summary-list"></div>
     </section>
 
     <section id="betSettingsScreen" class="setup-section is-hidden" aria-labelledby="betSettingsTitle">
@@ -408,28 +485,28 @@
   <script src="src/data/course.js?v=20260710-tee-handicap"></script>
   <script src="src/data/players.js?v=20260709-v098-menu"></script>
   <script src="src/rules/points.js?v=20260709-v098-menu"></script>
-  <script src="src/rules/handicap.js?v=20260710-tee-handicap"></script>
+  <script src="src/rules/handicap.js?v=20260710-handicap-verify"></script>
   <script src="src/rules/skins.js?v=20260709-v098-menu"></script>
   <script src="src/state/playerStorage.js?v=20260709-v098-menu"></script>
   <script src="src/state/scorerStorage.js?v=20260709-v098-menu"></script>
-  <script src="src/state/roundState.js?v=20260710-course-handicap-quota"></script>
+  <script src="src/state/roundState.js?v=20260710-gross-totals"></script>
   <script src="src/state/roundStorage.js?v=20260709-v098-menu"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="src/cloud/supabaseConfig.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/supabaseClient.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/roundCloudService.js?v=20260709-v098-menu"></script>
-  <script src="src/ui/dom.js?v=20260710-role-entry"></script>
+  <script src="src/ui/dom.js?v=20260710-scorekeeper-group-lock"></script>
   <script src="src/ui/formatters.js?v=20260710-index-course-handicap"></script>
-  <script src="src/ui/setupView.js?v=20260709-v098-menu"></script>
-  <script src="src/ui/holeView.js?v=20260710-index-course-handicap"></script>
-  <script src="src/ui/leaderboardView.js?v=20260710-index-course-handicap"></script>
+  <script src="src/ui/setupView.js?v=20260710-round-setup"></script>
+  <script src="src/ui/holeView.js?v=20260710-scorekeeper-simple"></script>
+  <script src="src/ui/leaderboardView.js?v=20260710-gross-totals"></script>
   <script src="src/ui/pointsPayoutView.js?v=20260710-points-quota"></script>
   <script src="src/ui/skinsView.js?v=20260709-v098-menu"></script>
-  <script src="src/ui/finalSummaryView.js?v=20260710-points-quota"></script>
-  <script src="src/ui/previousRoundsView.js?v=20260709-v098-menu"></script>
-  <script src="src/ui/playerManagementView.js?v=20260709-v098-menu"></script>
-  <script src="src/ui/groupSetupView.js?v=20260709-v098-menu"></script>
-  <script src="src/ui/eventSummaryView.js?v=20260710-preround-review"></script>
-  <script src="src/app.js?v=20260710-role-entry"></script>
+  <script src="src/ui/finalSummaryView.js?v=20260710-gross-totals"></script>
+  <script src="src/ui/previousRoundsView.js?v=20260710-gross-totals"></script>
+  <script src="src/ui/playerManagementView.js?v=20260710-player-verification"></script>
+  <script src="src/ui/groupSetupView.js?v=20260710-flex-hole-order"></script>
+  <script src="src/ui/eventSummaryView.js?v=20260710-round-setup"></script>
+  <script src="src/app.js?v=20260710-scorekeeper-group-lock"></script>
 </body>
 </html>

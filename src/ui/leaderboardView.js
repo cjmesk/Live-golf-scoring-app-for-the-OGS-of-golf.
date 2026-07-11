@@ -32,6 +32,9 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
     const frontPointsResult = roundState.getPointsDifferential(player, "front");
     const backPointsResult = roundState.getPointsDifferential(player, "back");
     const overallPointsResult = standing.pointsResult;
+    const frontGrossText = roundState.formatGrossTotal(totals, "front");
+    const backGrossText = roundState.formatGrossTotal(totals, "back");
+    const overallGrossText = roundState.formatGrossTotal(totals, "overall");
     const gameStatus = [
       roundState.isInSkins(player) ? "Skins" : "Not in Skins",
       roundState.isInPoints(player) ? "Points" : "Not in Points",
@@ -54,7 +57,8 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
         ${pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">Quota ${frontPointsResult.quota} per side / ${overallPointsResult.target} overall</span>` : ""}
         ${pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">${totals.points} pts earned</span>` : ""}
         ${pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">Front ${frontPointsResult.display} | Back ${backPointsResult.display}</span>` : ""}
-        <span class="gross">Gross ${totals.gross || "-"}</span>
+        <span class="gross">${overallGrossText}</span>
+        <span class="gross">${frontGrossText} | ${backGrossText}</span>
         <span class="gross">Net ${totals.net || "-"}</span>
       </div>
     `;

@@ -253,6 +253,60 @@ body.is-scoring h1 {
   gap: 10px;
 }
 
+.score-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.round-screen .leaderboard-section {
+  display: none;
+}
+
+.round-screen.is-leaderboard-view .hole-section {
+  display: none;
+}
+
+.round-screen.is-leaderboard-view .leaderboard-section {
+  display: block;
+}
+
+.round-screen.is-group-complete .round-status-bar,
+.round-screen.is-group-complete .score-nav,
+.round-screen.is-group-complete .hole-summary,
+.round-screen.is-group-complete .hole-players,
+.round-screen.is-group-complete .group-nav-row,
+.round-screen.is-group-complete .action-row,
+.round-screen.is-group-complete #groupCompletionSummary {
+  display: none;
+}
+
+.completed-group-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.completed-message {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.completed-group-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.group-score-review {
+  display: grid;
+  gap: 10px;
+}
+
+.group-score-review h3 {
+  margin: 0;
+}
+
 body.is-scoring .hole-section {
   margin-top: 0;
 }
@@ -400,6 +454,25 @@ body.is-scoring .current-hole-status {
   font-weight: 700;
 }
 
+.commissioner-view-badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: white;
+  background: var(--blue);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.hole-selector-label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
 .hole-players,
 .leaderboard {
   display: grid;
@@ -415,6 +488,11 @@ body.is-scoring .current-hole-status {
   display: grid;
   gap: 12px;
   padding: 14px;
+}
+
+.scorekeeper-player {
+  grid-template-columns: 1fr minmax(184px, 260px);
+  align-items: center;
 }
 
 .hole-player-info {
@@ -461,9 +539,42 @@ body.is-scoring .current-hole-status {
   font-weight: 800;
 }
 
+.course-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.course-info-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.course-info-table th,
+.course-info-table td {
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.course-info-table th:first-child,
+.course-info-table td:first-child {
+  text-align: left;
+}
+
+.course-info-table th {
+  color: var(--green-dark);
+  background: #eef5ef;
+  font-weight: 900;
+}
+
 .action-row {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-top: 12px;
 }
@@ -487,6 +598,9 @@ body.is-scoring .current-hole-status {
 .group-switcher-label {
   display: grid;
   gap: 6px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
 }
 
 .secondary-button {
@@ -753,7 +867,7 @@ body.is-scoring .current-hole-status {
   }
 
   .action-row {
-    grid-template-columns: 1fr 1.2fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 
   .group-nav-row {
@@ -806,6 +920,10 @@ body.is-scoring .current-hole-status {
 
   .leaderboard-row {
     grid-template-columns: 32px 1fr;
+  }
+
+  .scorekeeper-player {
+    grid-template-columns: 1fr;
   }
 
   .leaderboard-totals {

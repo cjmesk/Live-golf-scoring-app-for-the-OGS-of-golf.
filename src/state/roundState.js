@@ -84,6 +84,13 @@ window.OGSGolf.state.createRoundState = function createRoundState(
           totals.gross += Number(score);
           totals.net += Number(netScore);
           totals.holesPlayed += 1;
+          if (index < 9) {
+            totals.frontGross += Number(score);
+            totals.frontGrossHoles += 1;
+          } else {
+            totals.backGross += Number(score);
+            totals.backGrossHoles += 1;
+          }
           if (isInPoints(player)) {
             totals.points += points;
             if (index < 9) {
@@ -100,6 +107,10 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       },
       {
         gross: 0,
+        frontGross: 0,
+        backGross: 0,
+        frontGrossHoles: 0,
+        backGrossHoles: 0,
         net: 0,
         points: 0,
         frontPoints: 0,
@@ -113,6 +124,33 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         overallPointsTarget: getPointsQuota(player) * 2
       }
     );
+  }
+
+  function formatGrossTotal(totals, section = "overall") {
+    const values = {
+      front: {
+        label: "Front Gross",
+        gross: totals.frontGross,
+        holesPlayed: totals.frontGrossHoles,
+        holesNeeded: 9
+      },
+      back: {
+        label: "Back Gross",
+        gross: totals.backGross,
+        holesPlayed: totals.backGrossHoles,
+        holesNeeded: 9
+      },
+      overall: {
+        label: "Gross",
+        gross: totals.gross,
+        holesPlayed: totals.holesPlayed,
+        holesNeeded: totalHoles
+      }
+    }[section];
+
+    if (values.holesPlayed === 0) return `${values.label}: -`;
+    if (values.holesPlayed >= values.holesNeeded) return `${values.label}: ${values.gross}`;
+    return `${values.label}: ${values.gross} through ${values.holesPlayed} holes`;
   }
 
   function getPointsDifferential(player, section = "overall") {
@@ -438,6 +476,11 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         playerId: item.player.id,
         playerName: item.player.name,
         gross: item.totals.gross,
+        frontGross: item.totals.frontGross,
+        backGross: item.totals.backGross,
+        frontGrossHoles: item.totals.frontGrossHoles,
+        backGrossHoles: item.totals.backGrossHoles,
+        holesPlayed: item.totals.holesPlayed,
         net: item.totals.net,
         points: item.totals.points,
         frontPoints: item.totals.frontPoints,
@@ -475,6 +518,11 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         playerId: player.id,
         playerName: player.name,
         gross: playerTotals.gross,
+        frontGross: playerTotals.frontGross,
+        backGross: playerTotals.backGross,
+        frontGrossHoles: playerTotals.frontGrossHoles,
+        backGrossHoles: playerTotals.backGrossHoles,
+        holesPlayed: playerTotals.holesPlayed,
         net: playerTotals.net,
         points: playerTotals.points,
         frontPoints: playerTotals.frontPoints,
@@ -625,6 +673,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     getHolePointsResults,
     getSkinForHole,
     getPlayerTotals,
+    formatGrossTotal,
     getPointsQuota,
     getPointsDifferential,
     getPointsSummary,

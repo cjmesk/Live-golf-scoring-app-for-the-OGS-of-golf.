@@ -26,6 +26,21 @@ function getSkinsWinner(round) {
     .join(", ");
 }
 
+function formatPreviousGross(total) {
+  const holesPlayed = total.holesPlayed || 18;
+  const grossText = holesPlayed >= 18
+    ? `Gross ${total.gross}`
+    : `Gross ${total.gross} through ${holesPlayed} holes`;
+  const frontText = total.frontGrossHoles && total.frontGrossHoles < 9
+    ? `Front ${total.frontGross} through ${total.frontGrossHoles}`
+    : `Front ${total.frontGross ?? "-"}`;
+  const backText = total.backGrossHoles && total.backGrossHoles < 9
+    ? `Back ${total.backGross} through ${total.backGrossHoles}`
+    : `Back ${total.backGross ?? "-"}`;
+
+  return `${grossText} | ${frontText} | ${backText}`;
+}
+
 window.OGSGolf.ui.renderPreviousRounds = function renderPreviousRounds(elements, rounds) {
   const sortedRounds = [...rounds].sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -48,7 +63,7 @@ window.OGSGolf.ui.renderPreviousRounds = function renderPreviousRounds(elements,
         .map((total) => `
           <div class="previous-total-row">
             <span>${total.playerName}</span>
-            <small>Gross ${total.gross} | Net ${total.net} | ${total.points} pts | Skins ${total.skinsWon}</small>
+            <small>${formatPreviousGross(total)} | Net ${total.net} | ${total.points} pts | Skins ${total.skinsWon}</small>
           </div>
         `)
         .join("");

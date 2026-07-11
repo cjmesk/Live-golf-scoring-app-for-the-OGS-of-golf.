@@ -51,13 +51,20 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
     .join("");
 
   const totalRows = summary.playerTotals
-    .map((item) => `
-      <div class="summary-row">
-        <span>${item.player.name}</span>
-        <strong>${roundState.isInPoints(item.player) ? `${roundState.getPointsDifferential(item.player, "overall").display}` : "Not in Points"}</strong>
-        <small>Pts ${item.totals.points}/${item.totals.overallPointsTarget} | Gross ${item.totals.gross} | Net ${item.totals.net}</small>
-      </div>
-    `)
+    .map((item) => {
+      const frontGrossText = roundState.formatGrossTotal(item.totals, "front");
+      const backGrossText = roundState.formatGrossTotal(item.totals, "back");
+      const overallGrossText = roundState.formatGrossTotal(item.totals, "overall");
+
+      return `
+        <div class="summary-row">
+          <span>${item.player.name}</span>
+          <strong>${overallGrossText}</strong>
+          <small>${frontGrossText} | ${backGrossText}</small>
+          <small>${roundState.isInPoints(item.player) ? `Points ${roundState.getPointsDifferential(item.player, "overall").display} (${item.totals.points}/${item.totals.overallPointsTarget})` : "Not in Points"} | Net ${item.totals.net}</small>
+        </div>
+      `;
+    })
     .join("");
 
   elements.finalSummary.innerHTML = `

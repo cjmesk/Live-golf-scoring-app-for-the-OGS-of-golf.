@@ -32,19 +32,30 @@ window.OGSGolf.ui.fillPlayerForm = function fillPlayerForm(elements, player) {
 
 window.OGSGolf.ui.readPlayerForm = function readPlayerForm(elements) {
   const name = elements.playerName.value.trim();
+  const handicapValue = elements.playerHandicap.value.trim();
   const handicap = Number(elements.playerHandicap.value);
 
-  if (!name || Number.isNaN(handicap)) {
-    return null;
+  if (!name) {
+    return {
+      error: "Player name is required."
+    };
+  }
+
+  if (!handicapValue || !Number.isFinite(handicap)) {
+    return {
+      error: "Handicap index must be a valid number."
+    };
   }
 
   return {
+    player: {
     id: elements.editingPlayerId.value || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
     name,
     ghin: elements.playerGhin.value.trim(),
     handicap,
     tee: elements.playerTee.value,
     active: elements.playerActive.checked
+    }
   };
 };
 
@@ -65,9 +76,10 @@ window.OGSGolf.ui.renderPlayerManagement = function renderPlayerManagement(eleme
           <span class="player-details">
             ${player.ghin ? `GHIN ${escapeRosterText(player.ghin)}` : "No GHIN"}
             | Index ${player.handicap}
-            | ${escapeRosterText(player.tee)}
+            | Default tee ${escapeRosterText(player.tee)}
             | ${player.active ? "Active" : "Inactive"}
           </span>
+          <span class="player-details">Player ID: ${escapeRosterText(player.id)}</span>
         </div>
         <button type="button" class="secondary-button" data-edit-player="${escapeRosterText(player.id)}">Edit</button>
       </div>

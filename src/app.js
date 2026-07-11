@@ -7,10 +7,12 @@ const {
   getElements,
   readSetupSettings,
   readGroupAssignments,
+  readGroupPlaySettings,
   readGroupScorers,
   readPlayerForm,
   renderFinalSummary,
   renderEventSummary,
+  renderGroupScorerOptions,
   renderGroupSetupView,
   renderHoleView,
   renderLeaderboard,
@@ -50,6 +52,8 @@ function setActiveScreen(screenName) {
   elements.summaryScreen.classList.toggle("is-hidden", screenName !== "summary");
   elements.previousRoundsScreen.classList.toggle("is-hidden", screenName !== "previous");
   elements.playerManagementScreen.classList.toggle("is-hidden", screenName !== "players");
+  elements.courseInfoScreen.classList.toggle("is-hidden", screenName !== "courseInfo");
+  elements.handicapVerifyScreen.classList.toggle("is-hidden", screenName !== "handicapVerify");
   elements.courseManagementScreen.classList.toggle("is-hidden", screenName !== "courses");
   elements.betSettingsScreen.classList.toggle("is-hidden", screenName !== "bets");
   elements.helpScreen.classList.toggle("is-hidden", screenName !== "help");
@@ -182,6 +186,11 @@ async function openSetupWizard({ focusTeamSetup = false } = {}) {
   currentGroupIndex = 0;
   groupHoleIndexes = [];
   completedRoundSaved = false;
+  elements.roundDate.value = "";
+  elements.roundName.value = "";
+  elements.memberSearch.value = "";
+  elements.memberList.selectedMemberIds = new Set();
+  elements.memberList.teeOverrides = new Map();
   renderSetupView(elements, courses, members);
   setActiveScreen("setup");
   scrollToTop();
@@ -205,6 +214,7 @@ function showLiveScoring() {
 
   setActiveScreen("round");
   renderApp();
+  showScoreMyGroup();
   scrollToScoring();
 }
 
@@ -212,13 +222,165 @@ function showLeaderboard() {
   showLiveScoring();
 
   if (roundState) {
-    elements.leaderboard.scrollIntoView({ behavior: "auto", block: "start" });
+    showLeaderboardPage();
   }
 }
 
 function showSimpleScreen(screenName) {
   setActiveScreen(screenName);
   scrollToTop();
+}
+
+function formatRatingValue(value) {
+  return value === null || value === undefined ? "Not set" : value;
+}
+
+function renderCourseInfo() {
+  const course = selectedCourse || courses[0];
+  const teeIds = course.teeOrder;
+  const teeCards = teeIds
+    .map((teeId) => {
+      const tee = course.teeRatings[teeId];
+
+      return `
+        <div class="summary-card">
+          <span>${tee.label}</span>
+          <strong>${tee.totalYardage ?? "Not set"} yds</strong>
+          <small>Rating ${formatRatingValue(tee.courseRating)} | Slope ${formatRatingValue(tee.slopeRating)}</small>
+        </div>
+      `;
+    })
+    .join("");
+  const holeRows = course.tees[teeIds[0]]
+    .map((hole, index) => `
+      <tr>
+        <td>${hole.hole}</td>
+        <td>${hole.par}</td>
+        <td>${hole.handicap}</td>
+        ${teeIds.map((teeId) => `<td>${course.tees[teeId][index].yards ?? "Not set"}</td>`).join("")}
+      </tr>
+    `)
+    .join("");
+
+  elements.courseInfoContent.innerHTML = `
+    <div class="setup-panel">
+      <strong>${course.name}</strong>
+      <span class="player-details">Read-only verification. This page uses the same course data source as scoring.</span>
+    </div>
+
+    <section class="summary-block">
+      <h3>Tee Summary</h3>
+      <div class="summary-grid">${teeCards}</div>
+    </section>
+
+    <section class="summary-block">
+      <h3>Hole-by-Hole Data</h3>
+      <div class="course-table-wrap">
+        <table class="course-info-table">
+          <thead>
+            <tr>
+              <th>Hole</th>
+              <th>Par</th>
+              <th>HCP</th>
+              ${teeIds.map((teeId) => `<th>${course.teeRatings[teeId].label}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>${holeRows}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function formatHandicapNumber(value) {
+  return Number.isFinite(value) ? value.toFixed(2) : "Not available";
+}
+
+function getHandicapDetailsFor(player, course, teeId) {
+  return window.OGSGolf.rules.getCourseHandicapDetails(
+    { ...player, tee: teeId },
+    course,
+    teeId
+  );
+}
+
+function renderHandicapVerificationResult() {
+  const player = members.find((member) => member.id === elements.handicapVerifyPlayer.value) || members[0];
+  const course = courses.find((item) => item.id === elements.handicapVerifyCourse.value) || courses[0];
+  const teeId = elements.handicapVerifyTee.value || player?.tee || course.teeOrder[0];
+
+  if (!player || !course) {
+    elements.handicapVerifyResult.innerHTML = `<span class="player-details">No player or course available.</span>`;
+    return;
+  }
+
+  const tee = course.teeRatings[teeId];
+
+  if (!tee || tee.courseRating === null || tee.slopeRating === null) {
+    elements.handicapVerifyResult.innerHTML = `<span class="player-details">This tee is missing rating or slope data.</span>`;
+    return;
+  }
+
+  const details = getHandicapDetailsFor(player, course, teeId);
+
+  elements.handicapVerifyResult.innerHTML = `
+    <strong>Player: ${player.name}</strong>
+    <span class="player-details">Handicap Index: ${details.handicapIndex}</span>
+    <span class="player-details">Course: ${course.name}</span>
+    <span class="player-details">Tee: ${tee.label}</span>
+    <span class="player-details">Course Rating: ${details.courseRating}</span>
+    <span class="player-details">Slope Rating: ${details.slopeRating}</span>
+    <span class="player-details">Par: ${details.par}</span>
+    <span class="player-details">Unrounded: ${formatHandicapNumber(details.unrounded)}</span>
+    <strong>Course Handicap: ${details.courseHandicap}</strong>
+  `;
+}
+
+function renderHandicapVerificationExamples() {
+  const course = courses[0];
+  const examplePlayers = members.slice(0, 3);
+  const exampleTees = ["white", "silver", "gold"];
+
+  elements.handicapVerifyExamples.innerHTML = examplePlayers
+    .map((player, index) => {
+      const teeId = exampleTees[index] || player.tee || course.teeOrder[0];
+      const tee = course.teeRatings[teeId];
+      const details = getHandicapDetailsFor(player, course, teeId);
+
+      return `
+        <div class="summary-row">
+          <span>${player.name}</span>
+          <strong>${tee.label}: CH ${details.courseHandicap}</strong>
+          <small>Index ${details.handicapIndex} | Rating ${details.courseRating} | Slope ${details.slopeRating} | Par ${details.par}</small>
+          <small>Unrounded ${formatHandicapNumber(details.unrounded)}</small>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderHandicapVerification() {
+  const currentPlayerId = elements.handicapVerifyPlayer.value;
+  const currentCourseId = elements.handicapVerifyCourse.value || selectedCourse.id;
+  const course = courses.find((item) => item.id === currentCourseId) || selectedCourse || courses[0];
+  const player = members.find((member) => member.id === currentPlayerId) || members[0];
+
+  elements.handicapVerifyPlayer.innerHTML = members
+    .map((member) => `<option value="${member.id}"${member.id === player?.id ? " selected" : ""}>${member.name}</option>`)
+    .join("");
+  elements.handicapVerifyCourse.innerHTML = courses
+    .map((item) => `<option value="${item.id}"${item.id === course.id ? " selected" : ""}>${item.name}</option>`)
+    .join("");
+  elements.handicapVerifyTee.innerHTML = course.teeOrder
+    .map((teeId) => {
+      const tee = course.teeRatings[teeId];
+      const selected = teeId === (elements.handicapVerifyTee.value || player?.tee || course.teeOrder[0]);
+      return `<option value="${teeId}"${selected ? " selected" : ""}>${tee.label}</option>`;
+    })
+    .join("");
+
+  renderHandicapVerificationResult();
+  renderHandicapVerificationExamples();
 }
 
 function setCommissionerMode(isOn) {
@@ -237,6 +399,7 @@ function setCommissionerMode(isOn) {
       currentGroupIndex = getAssignedGroupIndex(currentScorerId);
       setActiveScreen("round");
       renderApp();
+      showScoreMyGroup();
       scrollToScoring();
       return;
     }
@@ -291,6 +454,23 @@ async function handleMenuAction(action) {
 
   if (action === "leaderboard") {
     showLeaderboard();
+    return;
+  }
+
+  if (action === "courseInfo") {
+    renderCourseInfo();
+    showSimpleScreen("courseInfo");
+    return;
+  }
+
+  if (action === "handicapVerify") {
+    if (!commissionerMode) {
+      showAdminRequiredMessage("Turn on Commissioner Mode to verify course handicaps.");
+      return;
+    }
+
+    renderHandicapVerification();
+    showSimpleScreen("handicapVerify");
     return;
   }
 
@@ -404,40 +584,67 @@ function renderHoleStatus() {
   if (!roundState) return;
 
   const visibleGroups = commissionerMode
-    || viewOnlyMode
     ? roundSettings.groups.map((group, index) => ({ group, index }))
-    : roundSettings.groups
-        .map((group, index) => ({ group, index }))
-        .filter((item) => roundSettings.groupScorers?.[item.index] === currentScorerId);
+    : [{ group: roundSettings.groups[currentGroupIndex], index: currentGroupIndex }];
   const canEdit = canEditCurrentGroup();
+  const groupComplete = isGroupComplete(currentGroupIndex);
 
+  elements.roundNameStatus.textContent = roundSettings.roundName || "OG's Golf";
+  elements.courseNameStatus.textContent = roundSettings.course?.name || selectedCourse.name;
+  elements.commissionerViewBadge.classList.toggle("is-hidden", !commissionerMode);
   elements.currentHoleStatus.textContent =
-    isGroupComplete(currentGroupIndex)
+    groupComplete
       ? `Group ${currentGroupIndex + 1} complete`
-      : `Current Hole: ${roundState.currentHoleIndex + 1} of ${roundState.totalHoles}`;
+      : `Hole ${roundState.currentHoleIndex + 1} of ${roundState.totalHoles}`;
   elements.currentGroupStatus.textContent =
-    `Group ${currentGroupIndex + 1} of ${roundSettings.groups.length}`;
+    `Group ${currentGroupIndex + 1}`;
   elements.groupSwitcher.innerHTML = visibleGroups
     .map(({ group, index }) => {
-      const groupHole = groupHoleIndexes[index] ?? 0;
-      const completeText = isGroupComplete(index) ? "complete" : `Hole ${Math.min(groupHole + 1, roundState.totalHoles)}`;
+      const groupRecord = getGroupRecord(index);
+      const completeText = isGroupComplete(index) ? "complete" : `Hole ${groupRecord.currentHole}`;
       return `<option value="${index}"${index === currentGroupIndex ? " selected" : ""}>Group ${index + 1} - ${completeText} - ${group.length} players</option>`;
     })
     .join("");
-  elements.previousGroup.disabled = (!commissionerMode && !viewOnlyMode) || currentGroupIndex === 0;
-  elements.nextGroup.disabled = (!commissionerMode && !viewOnlyMode) || currentGroupIndex === roundSettings.groups.length - 1;
-  elements.groupSwitcher.disabled = !commissionerMode && !viewOnlyMode;
-  elements.saveHole.disabled = !canEdit || (isGroupComplete(currentGroupIndex) && !commissionerMode);
-  elements.previousHole.disabled = !canEdit || roundState.currentHoleIndex === 0;
-  elements.nextHole.disabled = !canEdit || (isGroupComplete(currentGroupIndex) && !commissionerMode);
+  const sequence = getGroupHoleSequence(currentGroupIndex);
+  elements.holeSelector.innerHTML = getValidHoleNumbers()
+    .map((holeNumber) => {
+      const isRequired = sequence.includes(holeNumber);
+      const label = isRequired ? `Hole ${holeNumber}` : `Hole ${holeNumber} (extra)`;
+      return `<option value="${holeNumber}"${holeNumber === roundState.currentHoleIndex + 1 ? " selected" : ""}>${label}</option>`;
+    })
+    .join("");
+  elements.holeSelector.disabled = !canEdit;
+  elements.commissionerGroupControls.classList.toggle("is-hidden", !commissionerMode);
+  elements.previousGroup.classList.add("is-hidden");
+  elements.nextGroup.classList.add("is-hidden");
+  elements.previousGroup.disabled = true;
+  elements.nextGroup.disabled = true;
+  elements.groupSwitcher.disabled = !commissionerMode;
+  elements.roundScreen.classList.toggle("is-group-complete", groupComplete);
+  elements.saveHole.classList.toggle("is-hidden", groupComplete);
+  elements.saveHole.disabled = !canEdit || groupComplete;
+  elements.previousHole.disabled = !canEdit;
+  elements.nextHole.classList.add("is-hidden");
+  elements.undoLastHole.classList.add("is-hidden");
+  elements.nextHole.disabled = true;
   elements.undoLastHole.disabled = !canEdit;
   elements.holePlayers.querySelectorAll("button[data-player-id]").forEach((button) => {
     button.disabled = !canEdit;
   });
+  if (groupComplete) {
+    renderCompletedGroupPage();
+  } else {
+    elements.completedGroupPanel.classList.add("is-hidden");
+    renderGroupCompletionSummary();
+  }
 }
 
 function renderCurrentHole() {
-  renderHoleView(elements, selectedCourse, getCurrentGroupPlayers(), roundState);
+  if (isGroupComplete(currentGroupIndex)) {
+    syncRoundStateToCurrentGroup();
+  } else {
+    renderHoleView(elements, selectedCourse, getCurrentGroupPlayers(), roundState);
+  }
   renderHoleStatus();
 }
 
@@ -451,12 +658,251 @@ function getGroupPlayers(groupIndex) {
   return selectedPlayers.filter((player) => groupIds.includes(player.id));
 }
 
+function getValidHoleNumbers() {
+  const courseHoleCount = selectedCourse?.tees?.[selectedCourse.teeOrder?.[0]]?.length || 18;
+  return Array.from({ length: roundState?.totalHoles || courseHoleCount }, (_, index) => index + 1);
+}
+
+function buildHoleSequence(startingHole = 1, holesToPlay = 18) {
+  const totalHoles = roundState?.totalHoles || 18;
+  const start = Math.max(1, Math.min(totalHoles, Number(startingHole) || 1));
+  const count = Math.max(1, Math.min(totalHoles, Number(holesToPlay) || totalHoles));
+
+  return Array.from({ length: count }, (_, index) =>
+    ((start - 1 + index) % totalHoles) + 1
+  );
+}
+
+function getGroupRecord(groupIndex = currentGroupIndex) {
+  if (!roundSettings) return null;
+
+  roundSettings.groupRecords = roundSettings.groupRecords || [];
+  if (!roundSettings.groupRecords[groupIndex]) {
+    roundSettings.groupRecords[groupIndex] = {
+      id: `group-${groupIndex + 1}`,
+      label: `Group ${groupIndex + 1}`,
+      playerIds: roundSettings.groups[groupIndex] || [],
+      scorekeeperId: roundSettings.groupScorers?.[groupIndex] || "",
+      startingHole: (groupHoleIndexes[groupIndex] ?? 0) + 1,
+      currentHole: (groupHoleIndexes[groupIndex] ?? 0) + 1,
+      holesToPlay: roundState?.totalHoles || 18,
+      completedHoleNumbers: [],
+      status: "in_progress"
+    };
+  }
+
+  const record = roundSettings.groupRecords[groupIndex];
+  record.playerIds = roundSettings.groups[groupIndex] || record.playerIds || [];
+  record.scorekeeperId = roundSettings.groupScorers?.[groupIndex] || record.scorekeeperId || "";
+  record.startingHole = Number(record.startingHole || 1);
+  record.currentHole = Number(record.currentHole || record.startingHole || 1);
+  record.holesToPlay = Number(record.holesToPlay || roundState?.totalHoles || 18);
+  record.completedHoleNumbers = Array.from(new Set((record.completedHoleNumbers || []).map(Number))).sort((a, b) => a - b);
+  record.status = record.completedHoleNumbers.length >= record.holesToPlay ? "completed" : (record.status || "in_progress");
+
+  return record;
+}
+
+function getGroupHoleSequence(groupIndex = currentGroupIndex) {
+  const record = getGroupRecord(groupIndex);
+  return buildHoleSequence(record?.startingHole || 1, record?.holesToPlay || 18);
+}
+
+function setCurrentHoleForGroup(groupIndex, holeNumber) {
+  const validHoleNumbers = getValidHoleNumbers();
+  const nextHoleNumber = validHoleNumbers.includes(Number(holeNumber))
+    ? Number(holeNumber)
+    : validHoleNumbers[0];
+  const record = getGroupRecord(groupIndex);
+
+  record.currentHole = nextHoleNumber;
+  groupHoleIndexes[groupIndex] = nextHoleNumber - 1;
+}
+
+function markGroupHoleComplete(groupIndex, holeNumber) {
+  const record = getGroupRecord(groupIndex);
+  const sequence = getGroupHoleSequence(groupIndex);
+
+  if (!sequence.includes(holeNumber)) return;
+
+  record.completedHoleNumbers = Array.from(new Set([
+    ...(record.completedHoleNumbers || []),
+    holeNumber
+  ])).sort((a, b) => a - b);
+  record.status = record.completedHoleNumbers.length >= record.holesToPlay
+    ? "completed"
+    : "in_progress";
+}
+
+function getGroupGrossRows(groupIndex = currentGroupIndex) {
+  const record = getGroupRecord(groupIndex);
+  const sequence = getGroupHoleSequence(groupIndex);
+  const isNineHoleRound = Number(record.holesToPlay) === 9;
+  const nineLabel = sequence.every((holeNumber) => holeNumber <= 9)
+    ? "Front"
+    : sequence.every((holeNumber) => holeNumber >= 10)
+      ? "Back"
+      : "Nine";
+
+  return getGroupPlayers(groupIndex).map((player) => {
+    const front = sequence
+      .filter((holeNumber) => holeNumber <= 9)
+      .reduce((total, holeNumber) => total + Number(roundState.savedScores[player.id][holeNumber - 1] || 0), 0);
+    const back = sequence
+      .filter((holeNumber) => holeNumber >= 10)
+      .reduce((total, holeNumber) => total + Number(roundState.savedScores[player.id][holeNumber - 1] || 0), 0);
+    const gross = sequence.reduce((total, holeNumber) =>
+      total + Number(roundState.savedScores[player.id][holeNumber - 1] || 0), 0
+    );
+
+    return {
+      player,
+      holes: sequence.length,
+      front,
+      back,
+      gross,
+      isNineHoleRound,
+      nineLabel
+    };
+  });
+}
+
+function renderGroupCompletionSummary() {
+  if (!isGroupComplete(currentGroupIndex)) {
+    elements.groupCompletionSummary.classList.add("is-hidden");
+    elements.groupCompletionSummary.textContent = "";
+    return;
+  }
+
+  const record = getGroupRecord(currentGroupIndex);
+  const summaryRows = getGroupGrossRows(currentGroupIndex)
+    .map((row) => `${row.player.name}: Gross ${row.gross}`)
+    .join(" | ");
+
+  elements.groupCompletionSummary.classList.remove("is-hidden");
+  elements.groupCompletionSummary.textContent =
+    `Group ${currentGroupIndex + 1} complete: ${record.completedHoleNumbers.length} of ${record.holesToPlay} required holes saved. ${summaryRows}`;
+}
+
+function renderCompletedGroupPage() {
+  const record = getGroupRecord(currentGroupIndex);
+  const rows = getGroupGrossRows(currentGroupIndex);
+  const firstRow = rows[0];
+  const isNineHoleRound = firstRow?.isNineHoleRound;
+  const nineLabel = firstRow?.nineLabel || "Nine";
+  const headerCells = isNineHoleRound
+    ? `<th>Player</th><th>Holes</th><th>${nineLabel}</th><th>Gross</th>`
+    : `<th>Player</th><th>Holes</th><th>Front</th><th>Back</th><th>Gross</th>`;
+  const bodyRows = rows.map((row) => isNineHoleRound
+    ? `
+      <tr>
+        <td>${row.player.name}</td>
+        <td>${row.holes}</td>
+        <td>${row.gross}</td>
+        <td>${row.gross}</td>
+      </tr>
+    `
+    : `
+      <tr>
+        <td>${row.player.name}</td>
+        <td>${row.holes}</td>
+        <td>${row.front}</td>
+        <td>${row.back}</td>
+        <td>${row.gross}</td>
+      </tr>
+    `).join("");
+
+  elements.completedGroupTitle.textContent = `Group ${currentGroupIndex + 1} Round Complete`;
+  elements.completedGroupMessage.textContent =
+    `Group ${currentGroupIndex + 1} has completed all required holes. All gross scores have been saved.`;
+  elements.completedGroupGrossSummary.innerHTML = `
+    <table class="course-info-table completed-score-table">
+      <thead><tr>${headerCells}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+  `;
+  elements.completedGroupStatus.textContent = areAllGroupsComplete()
+    ? "All groups have completed the round. The commissioner may now review and close the event."
+    : "Waiting for the remaining groups to finish.";
+  elements.activeRoundManagement.classList.toggle("is-hidden", !commissionerMode);
+  elements.groupScoreReview.classList.add("is-hidden");
+  elements.groupScoreReview.innerHTML = "";
+  elements.completedGroupPanel.classList.remove("is-hidden");
+}
+
+function renderGroupScoreReview() {
+  const sequence = getGroupHoleSequence(currentGroupIndex);
+  const players = getCurrentGroupPlayers();
+  const holeRows = sequence.map((holeNumber) => {
+    const scores = players
+      .map((player) => `<td>${roundState.savedScores[player.id][holeNumber - 1] ?? "-"}</td>`)
+      .join("");
+
+    return `<tr><td>Hole ${holeNumber}</td>${scores}</tr>`;
+  }).join("");
+  const playerHeaders = players.map((player) => `<th>${player.name}</th>`).join("");
+  const grossRows = getGroupGrossRows(currentGroupIndex);
+  const firstRow = grossRows[0];
+  const isNineHoleRound = firstRow?.isNineHoleRound;
+  const nineLabel = firstRow?.nineLabel || "Nine";
+  const frontTotals = players.map((player) => {
+    const row = grossRows.find((grossRow) => grossRow.player.id === player.id);
+    return `<td>${row?.front || "-"}</td>`;
+  }).join("");
+  const backTotals = players.map((player) => {
+    const row = grossRows.find((grossRow) => grossRow.player.id === player.id);
+    return `<td>${row?.back || "-"}</td>`;
+  }).join("");
+  const grossTotals = players.map((player) => {
+    const row = grossRows.find((grossRow) => grossRow.player.id === player.id);
+    return `<td>${row?.gross ?? "-"}</td>`;
+  }).join("");
+  const nineTotals = players.map((player) => {
+    const row = grossRows.find((grossRow) => grossRow.player.id === player.id);
+    return `<td>${row?.gross ?? "-"}</td>`;
+  }).join("");
+
+  elements.groupScoreReview.innerHTML = `
+    <h3>Review Group ${currentGroupIndex + 1} Scores</h3>
+    <div class="course-table-wrap">
+      <table class="course-info-table completed-score-table">
+        <thead>
+          <tr><th>Hole</th>${playerHeaders}</tr>
+        </thead>
+        <tbody>
+          ${holeRows}
+          ${isNineHoleRound
+            ? `<tr><td><strong>${nineLabel} Gross</strong></td>${nineTotals}</tr>`
+            : `
+              <tr><td><strong>Front Gross</strong></td>${frontTotals}</tr>
+              <tr><td><strong>Back Gross</strong></td>${backTotals}</tr>
+            `}
+          <tr><td><strong>Total Gross</strong></td>${grossTotals}</tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+  elements.groupScoreReview.classList.toggle("is-hidden");
+}
+
+function showActiveRoundManagement() {
+  if (!commissionerMode) return;
+
+  elements.completedGroupStatus.textContent =
+    "Commissioner Mode: use the main menu to manage the active round or select another group.";
+}
+
+function getNextUncompletedHole(groupIndex) {
+  const record = getGroupRecord(groupIndex);
+  const completed = new Set(record.completedHoleNumbers || []);
+  return getGroupHoleSequence(groupIndex).find((holeNumber) => !completed.has(holeNumber)) || null;
+}
+
 function isGroupComplete(groupIndex) {
   if (!roundState || !roundSettings?.groups?.[groupIndex]) return false;
 
-  return getGroupPlayers(groupIndex).every((player) =>
-    roundState.savedScores[player.id].every((score) => score !== null)
-  );
+  const record = getGroupRecord(groupIndex);
+  return record.status === "completed" || record.completedHoleNumbers.length >= record.holesToPlay;
 }
 
 function getNextOpenGroupIndex(startingIndex) {
@@ -482,8 +928,8 @@ function areAllGroupsComplete() {
 function syncRoundStateToCurrentGroup() {
   if (!roundState) return;
 
-  const groupHoleIndex = groupHoleIndexes[currentGroupIndex] ?? 0;
-  roundState.goToHole(groupHoleIndex);
+  const record = getGroupRecord(currentGroupIndex);
+  roundState.goToHole(Math.max(0, Number(record.currentHole || 1) - 1));
 }
 
 function goToGroup(nextGroupIndex) {
@@ -499,7 +945,7 @@ function goToGroup(nextGroupIndex) {
 function goToHoleForCurrentGroup(nextHoleIndex) {
   if (!roundState) return;
 
-  groupHoleIndexes[currentGroupIndex] = Math.max(0, Math.min(roundState.totalHoles - 1, nextHoleIndex));
+  setCurrentHoleForGroup(currentGroupIndex, Math.max(1, Math.min(roundState.totalHoles, nextHoleIndex + 1)));
   syncRoundStateToCurrentGroup();
   renderCurrentHole();
 }
@@ -508,20 +954,30 @@ function renderApp() {
   renderRoundSettingsSummary(elements, roundSettings);
   renderCurrentHole();
   renderLeaderboard(elements, selectedPlayers, roundState);
+  elements.roundSettingsSummary.closest(".round-settings-section").classList.add("is-hidden");
+  elements.pointsPayout.closest(".points-payout-section").classList.add("is-hidden");
+  elements.skinsSummary.closest(".skins-section").classList.add("is-hidden");
+}
 
-  if (roundSettings.games.pointsGame.enabled) {
-    elements.pointsPayout.closest(".points-payout-section").classList.remove("is-hidden");
-    renderPointsPayout(elements, roundState);
-  } else {
-    elements.pointsPayout.closest(".points-payout-section").classList.add("is-hidden");
+function showScoreMyGroup() {
+  if (!roundState) return;
+
+  if (!commissionerMode && !viewOnlyMode && currentScorerId) {
+    currentGroupIndex = getAssignedGroupIndex(currentScorerId);
+    syncRoundStateToCurrentGroup();
+    renderCurrentHole();
   }
 
-  if (roundSettings.games.netSkins.enabled) {
-    elements.skinsSummary.closest(".skins-section").classList.remove("is-hidden");
-    renderSkinsSummary(elements, selectedPlayers, roundState);
-  } else {
-    elements.skinsSummary.closest(".skins-section").classList.add("is-hidden");
-  }
+  elements.roundScreen.classList.remove("is-leaderboard-view");
+  scrollToScoring();
+}
+
+function showLeaderboardPage() {
+  if (!roundState) return;
+
+  renderLeaderboard(elements, selectedPlayers, roundState);
+  elements.roundScreen.classList.add("is-leaderboard-view");
+  scrollToTop();
 }
 
 function getAssignedGroupIndex(playerId) {
@@ -565,6 +1021,7 @@ function continueFromTodayRound() {
     if (commissionerMode) {
       setActiveScreen("round");
       renderApp();
+      showScoreMyGroup();
       scrollToScoring();
       return;
     }
@@ -582,6 +1039,7 @@ function continueFromTodayRound() {
       syncRoundStateToCurrentGroup();
       setActiveScreen("round");
       renderApp();
+      showScoreMyGroup();
       scrollToScoring();
       return;
     }
@@ -610,7 +1068,7 @@ function viewLiveMatch() {
   viewOnlyMode = true;
   setActiveScreen("round");
   renderApp();
-  elements.leaderboard.scrollIntoView({ behavior: "auto", block: "start" });
+  showLeaderboardPage();
 }
 
 function choosePlayerOrScorer() {
@@ -633,6 +1091,7 @@ function openCommissionerFromToday() {
     if (roundState) {
       setActiveScreen("round");
       renderApp();
+      showScoreMyGroup();
       scrollToScoring();
       return;
     }
@@ -659,7 +1118,7 @@ function enterScorer(playerId) {
       syncRoundStateToCurrentGroup();
       setActiveScreen("round");
       renderApp();
-      scrollToScoring();
+      showLeaderboardPage();
       return;
     }
 
@@ -667,6 +1126,7 @@ function enterScorer(playerId) {
     syncRoundStateToCurrentGroup();
     setActiveScreen("round");
     renderApp();
+    showScoreMyGroup();
     scrollToScoring();
     return;
   }
@@ -692,6 +1152,11 @@ function mergeActiveRound(localRound, cloudRound, savedGroupIndex, savedHoleInde
 
   const mergedRound = {
     ...cloudRound,
+    roundSettings: {
+      ...(cloudRound.roundSettings || {}),
+      ...(localRound.roundSettings || {}),
+      groupRecords: localRound.roundSettings?.groupRecords || cloudRound.roundSettings?.groupRecords || []
+    },
     currentGroupIndex: localRound.currentGroupIndex,
     currentHoleIndex: localRound.currentHoleIndex,
     currentHole: localRound.currentHole,
@@ -761,6 +1226,7 @@ function showFinalSummary() {
 function reviewScorecard() {
   setActiveScreen("round");
   renderApp();
+  showScoreMyGroup();
 }
 
 function startFreshRound({ clearSavedRound = false } = {}) {
@@ -910,17 +1376,47 @@ function getUniquePlayerId(playerId) {
   return uniqueId;
 }
 
+function getAvailableTeeIds() {
+  return new Set((selectedCourse || courses[0]).teeOrder);
+}
+
+function findDuplicatePlayer(formPlayer, editingId) {
+  const normalizedName = formPlayer.name.trim().toLowerCase();
+  const normalizedGhin = formPlayer.ghin.trim().toLowerCase();
+
+  return members.find((player) => {
+    if (player.id === editingId) return false;
+    const sameName = player.name.trim().toLowerCase() === normalizedName;
+    const sameGhin = normalizedGhin && (player.ghin || "").trim().toLowerCase() === normalizedGhin;
+    return sameName || sameGhin;
+  });
+}
+
 function savePlayer(event) {
   event.preventDefault();
 
-  const formPlayer = readPlayerForm(elements);
+  const formResult = readPlayerForm(elements);
 
-  if (!formPlayer) {
-    elements.playerManagementStatus.textContent = "Enter a name and handicap before saving.";
+  if (formResult.error) {
+    elements.playerManagementStatus.textContent = formResult.error;
     return;
   }
 
+  const formPlayer = formResult.player;
   const editingId = elements.editingPlayerId.value;
+  const availableTeeIds = getAvailableTeeIds();
+
+  if (!availableTeeIds.has(formPlayer.tee)) {
+    elements.playerManagementStatus.textContent = "Default tee must match an available tee for this course.";
+    return;
+  }
+
+  const duplicatePlayer = findDuplicatePlayer(formPlayer, editingId);
+
+  if (duplicatePlayer) {
+    elements.playerManagementStatus.textContent = `Possible duplicate: ${duplicatePlayer.name}. Edit that player instead of creating a new record.`;
+    return;
+  }
 
   if (!editingId && members.length >= maxRosterSize) {
     elements.playerManagementStatus.textContent = "The roster already has 50 members.";
@@ -928,6 +1424,11 @@ function savePlayer(event) {
   }
 
   if (editingId) {
+    if (!members.some((player) => player.id === editingId)) {
+      elements.playerManagementStatus.textContent = "Could not find the existing player record to update.";
+      return;
+    }
+
     members = members.map((player) => (player.id === editingId ? formPlayer : player));
   } else {
     members = [...members, { ...formPlayer, id: getUniquePlayerId(formPlayer.id) }];
@@ -936,7 +1437,32 @@ function savePlayer(event) {
   playerStorage.saveAll(members);
   clearPlayerForm(elements);
   renderPlayerManagement(elements, members, maxRosterSize);
-  elements.playerManagementStatus.textContent = "Player saved on this device.";
+  elements.playerManagementStatus.textContent = formPlayer.active
+    ? "Player saved on this device."
+    : "Player marked inactive. Historical round data is preserved.";
+}
+
+function exportRosterBackup() {
+  const backup = {
+    exportedAt: new Date().toISOString(),
+    source: "OGS Golf Player Management",
+    playerCount: members.length,
+    players: members
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {
+    type: "application/json"
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const dateStamp = new Date().toISOString().slice(0, 10);
+
+  link.href = url;
+  link.download = `ogs-golf-roster-backup-${dateStamp}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  elements.playerManagementStatus.textContent = `Roster backup exported with ${members.length} players.`;
 }
 
 async function saveRosterToCloud() {
@@ -985,7 +1511,15 @@ function continueToGroups() {
 
   pendingRoundSettings = readSetupSettings(elements, courses, members);
 
-  if (pendingRoundSettings.players.length === 0) return;
+  if (!pendingRoundSettings.course || !pendingRoundSettings.date) {
+    elements.modeStatus.textContent = "Choose a course and date before continuing.";
+    return;
+  }
+
+  if (pendingRoundSettings.players.length === 0) {
+    elements.modeStatus.textContent = "Select at least one active player before continuing.";
+    return;
+  }
 
   renderGroupSetupView(elements, pendingRoundSettings);
   setActiveScreen("groups");
@@ -997,17 +1531,90 @@ function backToRoundSetup() {
   scrollToTop();
 }
 
+function updateGroupCount(amount) {
+  if (!pendingRoundSettings) return;
+
+  const currentGroups = readGroupAssignments(elements, pendingRoundSettings.players);
+  const currentCount = elements.groupSetupList.groupCount || Math.max(1, currentGroups.length);
+  const nextCount = Math.max(1, currentCount + amount);
+  pendingRoundSettings.groups = currentGroups;
+  pendingRoundSettings.groupCount = nextCount;
+  renderGroupSetupView(elements, pendingRoundSettings);
+}
+
+function refreshScorekeeperChoices() {
+  if (!pendingRoundSettings) return;
+
+  const groups = readGroupAssignments(elements, pendingRoundSettings.players);
+  renderGroupScorerOptions(elements, pendingRoundSettings.players, groups);
+}
+
+function createGroupRecords(groups, groupScorers, groupPlaySettings = []) {
+  return groups.map((group, index) => ({
+    id: `group-${index + 1}`,
+    label: `Group ${index + 1}`,
+    playerIds: group,
+    scorekeeperId: groupScorers[index],
+    startingHole: groupPlaySettings[index]?.startingHole || 1,
+    currentHole: groupPlaySettings[index]?.startingHole || 1,
+    holesToPlay: groupPlaySettings[index]?.holesToPlay || 18,
+    completedHoleNumbers: [],
+    status: "in_progress"
+  }));
+}
+
+function validateGroupSetup(groups, groupScorers, players) {
+  const selectedPlayerIds = players.map((player) => player.id);
+  const assignedPlayerIds = groups.flat();
+  const assignedSet = new Set(assignedPlayerIds);
+
+  if (groups.length === 0) {
+    return "Create at least one group.";
+  }
+
+  if (assignedPlayerIds.length !== selectedPlayerIds.length || assignedSet.size !== selectedPlayerIds.length) {
+    return "Every selected player must be assigned to exactly one group.";
+  }
+
+  const missingPlayer = selectedPlayerIds.find((playerId) => !assignedSet.has(playerId));
+  if (missingPlayer) {
+    return "Every selected player must be assigned to a group.";
+  }
+
+  const groupWithoutScorer = groups.findIndex((group, index) => {
+    const scorerId = groupScorers[index];
+    return !scorerId || !group.includes(scorerId);
+  });
+
+  if (groupWithoutScorer >= 0) {
+    return `Choose a scorekeeper from Group ${groupWithoutScorer + 1}.`;
+  }
+
+  return "";
+}
+
 function reviewEventSummary() {
   if (!pendingRoundSettings) return;
 
+  const groups = readGroupAssignments(elements, pendingRoundSettings.players);
+  const groupScorers = readGroupScorers(elements, groups);
+  const groupPlaySettings = readGroupPlaySettings(elements, groups);
+  const validationMessage = validateGroupSetup(groups, groupScorers, pendingRoundSettings.players);
+
+  if (validationMessage) {
+    elements.groupSetupStatus.textContent = validationMessage;
+    return;
+  }
+
   roundSettings = {
     ...pendingRoundSettings,
-    groups: readGroupAssignments(elements, pendingRoundSettings.players),
+    groups,
+    groupScorers,
+    groupRecords: createGroupRecords(groups, groupScorers, groupPlaySettings),
     eventStatus: "Pre-Round Review",
     setupLocked: false,
     preRoundReviewComplete: false
   };
-  roundSettings.groupScorers = readGroupScorers(elements, roundSettings.groups);
   renderEventSummary(elements, roundSettings);
   setActiveScreen("eventSummary");
   scrollToTop();
@@ -1023,6 +1630,9 @@ async function beginGroupedRound() {
 
   roundSettings = {
     ...roundSettings,
+    groupRecords: roundSettings.groupRecords,
+    startingHole: roundSettings.groupRecords?.[0]?.startingHole || 1,
+    currentHole: roundSettings.groupRecords?.[0]?.currentHole || 1,
     eventStatus: "Started",
     setupLocked: true,
     preRoundReviewComplete: true,
@@ -1032,7 +1642,9 @@ async function beginGroupedRound() {
   selectedPlayers = roundSettings.players;
   roundState = createRoundState(selectedCourse, selectedPlayers, roundSettings);
   currentGroupIndex = 0;
-  groupHoleIndexes = roundSettings.groups.map(() => 0);
+  groupHoleIndexes = roundSettings.groups.map((group, index) =>
+    Math.max(0, (getGroupRecord(index).currentHole || 1) - 1)
+  );
   completedRoundSaved = false;
   roundStorage.clearUnfinished();
 
@@ -1055,7 +1667,10 @@ function loadSavedRoundIntoState(savedRound) {
   };
   roundState = createRoundState(selectedCourse, selectedPlayers, roundSettings, savedRound);
   currentGroupIndex = savedRound.currentGroupIndex || 0;
-  groupHoleIndexes = savedRound.groupHoleIndexes || roundSettings.groups.map(() => savedRound.currentHoleIndex || 0);
+  roundSettings.groupRecords = roundSettings.groupRecords || savedRound.roundSettings?.groupRecords || [];
+  groupHoleIndexes = savedRound.groupHoleIndexes || roundSettings.groups.map((group, index) =>
+    Math.max(0, (getGroupRecord(index).currentHole || savedRound.currentHole || 1) - 1)
+  );
 
   if (!commissionerMode && currentScorerId) {
     currentGroupIndex = getAssignedGroupIndex(currentScorerId);
@@ -1146,6 +1761,9 @@ elements.appMenu.addEventListener("click", (event) => {
 });
 elements.startRound.addEventListener("click", continueToGroups);
 elements.backToRoundSetup.addEventListener("click", backToRoundSetup);
+elements.addGroup.addEventListener("click", () => updateGroupCount(1));
+elements.removeGroup.addEventListener("click", () => updateGroupCount(-1));
+elements.groupSetupList.addEventListener("change", refreshScorekeeperChoices);
 elements.beginGroupedRound.addEventListener("click", reviewEventSummary);
 elements.backToGroupSetup.addEventListener("click", backToGroupSetup);
 elements.confirmStartRound.addEventListener("click", beginGroupedRound);
@@ -1179,7 +1797,15 @@ elements.previousHole.addEventListener("click", () => {
   if (!roundState) return;
   if (!canEditCurrentGroup()) return;
 
-  goToHoleForCurrentGroup((groupHoleIndexes[currentGroupIndex] ?? 0) - 1);
+  const sequence = getGroupHoleSequence(currentGroupIndex);
+  const currentHoleNumber = roundState.currentHoleIndex + 1;
+  const currentSequenceIndex = sequence.indexOf(currentHoleNumber);
+  const previousSequenceIndex = currentSequenceIndex > 0
+    ? currentSequenceIndex - 1
+    : Math.max(0, sequence.length - 1);
+  setCurrentHoleForGroup(currentGroupIndex, sequence[previousSequenceIndex] || currentHoleNumber);
+  syncRoundStateToCurrentGroup();
+  renderCurrentHole();
 });
 
 elements.nextHole.addEventListener("click", () => {
@@ -1198,7 +1824,17 @@ elements.nextGroup.addEventListener("click", () => {
 });
 
 elements.groupSwitcher.addEventListener("change", () => {
+  if (!commissionerMode) return;
   goToGroup(Number(elements.groupSwitcher.value));
+});
+
+elements.holeSelector.addEventListener("change", () => {
+  if (!roundState) return;
+  if (!canEditCurrentGroup()) return;
+
+  setCurrentHoleForGroup(currentGroupIndex, Number(elements.holeSelector.value));
+  syncRoundStateToCurrentGroup();
+  renderCurrentHole();
 });
 
 elements.saveHole.addEventListener("click", async () => {
@@ -1206,40 +1842,64 @@ elements.saveHole.addEventListener("click", async () => {
   if (!canEditCurrentGroup()) return;
 
   syncRoundStateToCurrentGroup();
-  const savedHoleIndex = Math.min(
-    groupHoleIndexes[currentGroupIndex] ?? roundState.currentHoleIndex,
-    roundState.totalHoles - 1
-  );
-  const savedGroupIndex = currentGroupIndex;
-  const isLastHole = savedHoleIndex === roundState.totalHoles - 1;
-  roundState.saveCurrentHole(getCurrentGroupPlayers());
+  const groupPlayers = getCurrentGroupPlayers();
+  const hasInvalidScore = groupPlayers.some((player) => {
+    const score = roundState.draftScores[player.id];
+    return !Number.isFinite(Number(score)) || Number(score) < 1;
+  });
 
-  if (isLastHole) {
-    groupHoleIndexes[savedGroupIndex] = roundState.totalHoles;
-  }
-
-  if (roundState.isRoundComplete() || areAllGroupsComplete()) {
-    showFinalSummary();
+  if (hasInvalidScore) {
+    elements.saveStatusMessage.textContent = "Enter a gross score for every player in this group.";
     return;
   }
 
-  if (isLastHole) {
-    const nextOpenGroupIndex = commissionerMode ? getNextOpenGroupIndex(savedGroupIndex) : null;
+  const savedHoleIndex = roundState.currentHoleIndex;
+  const savedHoleNumber = savedHoleIndex + 1;
+  const savedGroupIndex = currentGroupIndex;
 
-    if (nextOpenGroupIndex !== null) {
-      currentGroupIndex = nextOpenGroupIndex;
-    }
-  } else {
-    groupHoleIndexes[savedGroupIndex] = savedHoleIndex + 1;
+  try {
+    roundState.saveCurrentHole(groupPlayers);
+  } catch (error) {
+    elements.saveStatusMessage.textContent = "Save failed. Scores were not advanced.";
+    return;
   }
 
+  markGroupHoleComplete(savedGroupIndex, savedHoleNumber);
+  const nextHoleNumber = getNextUncompletedHole(savedGroupIndex);
+
+  if (nextHoleNumber === null) {
+    getGroupRecord(savedGroupIndex).status = "completed";
+    groupHoleIndexes[savedGroupIndex] = savedHoleIndex;
+  } else {
+    setCurrentHoleForGroup(savedGroupIndex, nextHoleNumber);
+  }
+
+  currentGroupIndex = savedGroupIndex;
+
   syncRoundStateToCurrentGroup();
-  const mergedRound = await autoSaveUnfinishedRound(savedGroupIndex, savedHoleIndex);
+  let mergedRound = null;
+  try {
+    mergedRound = await autoSaveUnfinishedRound(savedGroupIndex, savedHoleIndex);
+  } catch (error) {
+    const localSave = roundState.getAutoSaveExport();
+    localSave.groupHoleIndexes = groupHoleIndexes;
+    localSave.currentGroupIndex = currentGroupIndex;
+    localSave.currentHoleIndex = Math.min(
+      groupHoleIndexes[currentGroupIndex] ?? roundState.currentHoleIndex,
+      roundState.totalHoles - 1
+    );
+    localSave.currentHole = localSave.currentHoleIndex + 1;
+    roundStorage.saveUnfinished(localSave);
+    elements.saveStatusMessage.textContent = "Saved on this device. Cloud backup did not finish.";
+  }
+
   if (mergedRound) {
     loadSavedRoundIntoState(mergedRound);
   }
   renderApp();
-  showSaveStatus(savedHoleIndex, savedGroupIndex);
+  if (mergedRound) {
+    showSaveStatus(savedHoleIndex, savedGroupIndex);
+  }
   scrollToScoring();
 });
 
@@ -1275,15 +1935,22 @@ elements.changeScorer.addEventListener("click", () => {
   commissionerMode = false;
   renderScorerSelection();
 });
-elements.viewOverallLeaderboard.addEventListener("click", () => {
-  elements.leaderboard.scrollIntoView({ behavior: "auto", block: "start" });
-});
+elements.scoreMyGroup.addEventListener("click", showScoreMyGroup);
+elements.viewOverallLeaderboard.addEventListener("click", showLeaderboardPage);
+elements.changeScorerLeaderboard.addEventListener("click", showLeaderboardPage);
+elements.completedViewLeaderboard.addEventListener("click", showLeaderboardPage);
+elements.reviewGroupScores.addEventListener("click", renderGroupScoreReview);
+elements.activeRoundManagement.addEventListener("click", showActiveRoundManagement);
 elements.playerForm.addEventListener("submit", savePlayer);
+elements.handicapVerifyPlayer.addEventListener("change", renderHandicapVerificationResult);
+elements.handicapVerifyCourse.addEventListener("change", renderHandicapVerification);
+elements.handicapVerifyTee.addEventListener("change", renderHandicapVerificationResult);
 elements.clearPlayerForm.addEventListener("click", () => {
   clearPlayerForm(elements);
   renderPlayerManagement(elements, members, maxRosterSize);
 });
 elements.loadRosterCloud.addEventListener("click", () => loadRosterFromCloud({ manual: true }));
+elements.exportRosterBackup.addEventListener("click", exportRosterBackup);
 elements.saveRosterCloud.addEventListener("click", saveRosterToCloud);
 elements.backFromPlayerManagement.addEventListener("click", returnFromPlayerManagement);
 elements.playerManagementList.addEventListener("click", (event) => {

@@ -22,22 +22,23 @@ function getTotalYardage(yardages) {
   return yardages.reduce((total, yards) => total + yards, 0);
 }
 
-function buildTeeSummary(label, yardages, courseRating, slopeRating, status = "verified") {
+function buildTeeSummary(label, yardages, courseRating, slopeRating, status = "verified", genderRatings = {}) {
   return {
     label,
     par: twelveStonesParByHole.reduce((total, par) => total + par, 0),
     totalYardage: getTotalYardage(yardages),
     courseRating,
     slopeRating,
+    genderRatings,
     status
   };
 }
 
-const blackYardages = Array(18).fill(null);
+const blackYardages = [424, 203, 537, 375, 295, 228, 534, 367, 395, 539, 434, 388, 319, 589, 165, 407, 192, 436];
 const silverYardages = [396, 183, 520, 352, 245, 198, 512, 330, 371, 515, 404, 362, 291, 549, 153, 398, 178, 401];
 const whiteYardages = [364, 155, 454, 331, 201, 184, 485, 304, 363, 474, 378, 338, 267, 492, 142, 376, 167, 367];
-const goldYardages = Array(18).fill(null);
-const redYardages = Array(18).fill(null);
+const goldYardages = [331, 131, 437, 324, 195, 164, 442, 263, 324, 444, 373, 315, 237, 448, 136, 351, 161, 338];
+const redYardages = [287, 107, 419, 290, 188, 139, 400, 229, 319, 418, 322, 271, 221, 441, 109, 311, 147, 309];
 
 window.OGSGolf.data.courses = [
   {
@@ -46,18 +47,29 @@ window.OGSGolf.data.courses = [
     par: 72,
     teeOrder: ["black", "silver", "white", "gold", "red"],
     teeRatings: {
-      black: buildTeeSummary("Black", blackYardages, 72, 113, "TODO: confirm official yardages, course rating, and slope rating"),
-      silver: buildTeeSummary("Silver", silverYardages, 72, 113, "TODO: confirm official course rating and slope rating"),
-      white: buildTeeSummary("White", whiteYardages, 72, 113, "TODO: confirm official course rating and slope rating"),
-      gold: buildTeeSummary("Gold", goldYardages, 72, 113, "TODO: confirm official yardages, course rating, and slope rating"),
-      red: buildTeeSummary("Red", redYardages, 72, 113, "TODO: confirm official yardages, course rating, and slope rating")
+      black: buildTeeSummary("Black", blackYardages, 73.3, 145, "Men's rating and slope confirmed", {
+        men: { courseRating: 73.3, slopeRating: 145 }
+      }),
+      silver: buildTeeSummary("Silver", silverYardages, 71.3, 141, "Men's rating and slope confirmed", {
+        men: { courseRating: 71.3, slopeRating: 141 }
+      }),
+      white: buildTeeSummary("White", whiteYardages, 69.1, 132, "Men's and women's rating and slope confirmed", {
+        men: { courseRating: 69.1, slopeRating: 132 },
+        women: { courseRating: 75.2, slopeRating: 137 }
+      }),
+      gold: buildTeeSummary("Gold", goldYardages, 67.5, 122, "Men's rating and slope confirmed", {
+        men: { courseRating: 67.5, slopeRating: 122 }
+      }),
+      red: buildTeeSummary("Red", redYardages, 70.2, 125, "Women's rating and slope confirmed", {
+        women: { courseRating: 70.2, slopeRating: 125 }
+      })
     },
     tees: {
-      black: buildTeeHoles(blackYardages, "TODO: confirm official Black tee yardage"),
+      black: buildTeeHoles(blackYardages),
       silver: buildTeeHoles(silverYardages),
       white: buildTeeHoles(whiteYardages),
-      gold: buildTeeHoles(goldYardages, "TODO: confirm official Gold tee yardage"),
-      red: buildTeeHoles(redYardages, "TODO: confirm official Red tee yardage")
+      gold: buildTeeHoles(goldYardages),
+      red: buildTeeHoles(redYardages)
     }
   }
 ];

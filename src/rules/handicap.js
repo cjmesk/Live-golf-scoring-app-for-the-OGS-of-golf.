@@ -1,17 +1,29 @@
 window.OGSGolf = window.OGSGolf || {};
 window.OGSGolf.rules = window.OGSGolf.rules || {};
 
-window.OGSGolf.rules.getCourseHandicap = function getCourseHandicap(player, course) {
-  const teeRating = course.teeRatings[player.tee];
+window.OGSGolf.rules.getCourseHandicapDetails = function getCourseHandicapDetails(player, course, teeId = player.tee) {
+  const teeRating = course.teeRatings[teeId];
   const teePar = teeRating.par || course.par;
+  const handicapIndex = Number(player.handicap) || 0;
+  const unrounded = handicapIndex * (teeRating.slopeRating / 113) + (teeRating.courseRating - teePar);
 
+  return {
+    handicapIndex,
+    teeId,
+    courseRating: teeRating.courseRating,
+    slopeRating: teeRating.slopeRating,
+    par: teePar,
+    unrounded,
+    courseHandicap: Math.round(unrounded)
+  };
+};
+
+window.OGSGolf.rules.getCourseHandicap = function getCourseHandicap(player, course) {
   // Course Handicap turns a player's Handicap Index into the number of strokes
   // they receive from a specific tee. Slope adjusts for difficulty compared with
   // an average course. Course Rating minus par adjusts when the tee plays easier
   // or harder than par.
-  return Math.round(
-    player.handicap * (teeRating.slopeRating / 113) + (teeRating.courseRating - teePar)
-  );
+  return window.OGSGolf.rules.getCourseHandicapDetails(player, course).courseHandicap;
 };
 
 window.OGSGolf.rules.getStrokesOnHole = function getStrokesOnHole(courseHandicap, holeHandicap) {
