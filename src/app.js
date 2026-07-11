@@ -10,6 +10,7 @@ const {
   readGroupPlaySettings,
   readGroupScorers,
   readPlayerForm,
+  renderCompletedScorecard,
   renderFinalSummary,
   renderEventSummary,
   renderGroupScorerOptions,
@@ -787,40 +788,18 @@ function renderGroupCompletionSummary() {
 function renderCompletedGroupPage() {
   const record = getGroupRecord(currentGroupIndex);
   const rows = getGroupGrossRows(currentGroupIndex);
-  const firstRow = rows[0];
-  const isNineHoleRound = firstRow?.isNineHoleRound;
-  const nineLabel = firstRow?.nineLabel || "Nine";
-  const headerCells = isNineHoleRound
-    ? `<th>Player</th><th>Holes</th><th>${nineLabel}</th><th>Gross</th>`
-    : `<th>Player</th><th>Holes</th><th>Front</th><th>Back</th><th>Gross</th>`;
-  const bodyRows = rows.map((row) => isNineHoleRound
-    ? `
-      <tr>
-        <td>${row.player.name}</td>
-        <td>${row.holes}</td>
-        <td>${row.gross}</td>
-        <td>${row.gross}</td>
-      </tr>
-    `
-    : `
-      <tr>
-        <td>${row.player.name}</td>
-        <td>${row.holes}</td>
-        <td>${row.front}</td>
-        <td>${row.back}</td>
-        <td>${row.gross}</td>
-      </tr>
-    `).join("");
+  const compactRows = rows.map((row) => `
+    <div class="completed-gross-row">
+      <strong>${row.player.name}</strong>
+      <span>${row.holes} holes</span>
+      <b>Gross ${row.gross}</b>
+    </div>
+  `).join("");
 
   elements.completedGroupTitle.textContent = `Group ${currentGroupIndex + 1} Round Complete`;
   elements.completedGroupMessage.textContent =
     `Group ${currentGroupIndex + 1} has completed all required holes. All gross scores have been saved.`;
-  elements.completedGroupGrossSummary.innerHTML = `
-    <table class="course-info-table completed-score-table">
-      <thead><tr>${headerCells}</tr></thead>
-      <tbody>${bodyRows}</tbody>
-    </table>
-  `;
+  elements.completedGroupGrossSummary.innerHTML = compactRows;
   elements.completedGroupStatus.textContent = areAllGroupsComplete()
     ? "All groups have completed the round. The commissioner may now review and close the event."
     : "Waiting for the remaining groups to finish.";
@@ -1224,9 +1203,10 @@ function showFinalSummary() {
 }
 
 function reviewScorecard() {
-  setActiveScreen("round");
-  renderApp();
-  showScoreMyGroup();
+  setActiveScreen("summary");
+  renderCompletedScorecard(elements, roundState);
+  elements.cloudSaveStatus.textContent = "Showing compact scorecard.";
+  scrollToTop();
 }
 
 function startFreshRound({ clearSavedRound = false } = {}) {
@@ -1752,6 +1732,31 @@ elements.toggleCommissionerMode.addEventListener("click", () => {
     scrollToScoring();
   }
 });
+function submitCommissionerPinFromKeyboard(event) {
+  if (event.key && event.key !== "Enter") return;
+  if (commissionerMode) return;
+
+  event?.preventDefault();
+  const changed = turnOnCommissionerFromMenu();
+
+  if (!changed) return;
+
+  closeMenu();
+
+  if (commissionerMode && !roundState) {
+    setActiveScreen("setup");
+    return;
+  }
+
+  if (commissionerMode && roundState) {
+    setActiveScreen("round");
+    renderApp();
+    scrollToScoring();
+  }
+}
+
+elements.menuCommissionerPin.addEventListener("keydown", submitCommissionerPinFromKeyboard);
+elements.menuCommissionerPin.addEventListener("keyup", submitCommissionerPinFromKeyboard);
 elements.appMenu.addEventListener("click", (event) => {
   const menuButton = event.target.closest("[data-menu-action]");
 
