@@ -4,9 +4,7 @@ window.OGSGolf.ui = window.OGSGolf.ui || {};
 window.OGSGolf.ui.gameOptions = [
   { id: "netSkins", label: "Net Skins", defaultEnabled: false, defaultAmount: 0 },
   { id: "pointsGame", label: "Points Game", defaultEnabled: false, defaultAmount: 0 },
-  { id: "teamChallenge", label: "Team Challenge", defaultEnabled: false, defaultAmount: 0 },
-  { id: "closestToPin", label: "Closest to the Pin", defaultEnabled: false, defaultAmount: 0 },
-  { id: "longDrive", label: "Long Drive", defaultEnabled: false, defaultAmount: 0 }
+  { id: "teamChallenge", label: "Team Challenge", defaultEnabled: false, defaultAmount: 0 }
 ];
 
 function getTodayInputValue() {
@@ -130,8 +128,6 @@ window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, cours
       tee: teeOverrides.get(member.id) || member.tee,
       inSkins: false,
       inPoints: false,
-      inClosestToPin: false,
-      inLongDrive: false,
       inTeamChallenge: false,
       teamId: ""
     }));

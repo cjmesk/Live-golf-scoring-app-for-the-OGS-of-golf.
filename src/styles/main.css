@@ -259,9 +259,17 @@ body.is-scoring h1 {
   margin-bottom: 10px;
 }
 
+.live-refresh-status {
+  margin: 0;
+}
+
 @media (min-width: 640px) {
   .score-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .live-refresh-status {
+    grid-column: 1 / -1;
   }
 }
 

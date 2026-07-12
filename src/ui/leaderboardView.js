@@ -41,8 +41,7 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
     const gameStatus = [
       roundState.isInSkins(player) ? "Skins" : "Not in Skins",
       roundState.isInPoints(player) ? "Points" : "Not in Points",
-      player.inClosestToPin !== false ? "CTP" : "Not in CTP",
-      player.inLongDrive !== false ? "Long Drive" : "Not in Long Drive"
+      player.inTeamChallenge === true ? "Team Event" : "Not in Team Event"
     ].join(" | ");
     const row = document.createElement("div");
     row.className = "leaderboard-row";

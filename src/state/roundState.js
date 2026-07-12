@@ -571,8 +571,6 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         tee: player.tee,
         inSkins: isInSkins(player),
         inPoints: isInPoints(player),
-        inClosestToPin: player.inClosestToPin !== false,
-        inLongDrive: player.inLongDrive !== false,
         inTeamChallenge: player.inTeamChallenge === true,
         teamId: player.teamId || "",
         courseHandicap: courseHandicaps[player.id],
@@ -695,8 +693,6 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         tee: player.tee,
         inSkins: isInSkins(player),
         inPoints: isInPoints(player),
-        inClosestToPin: player.inClosestToPin !== false,
-        inLongDrive: player.inLongDrive !== false,
         inTeamChallenge: player.inTeamChallenge === true,
         teamId: player.teamId || "",
         courseHandicap: courseHandicaps[player.id],
@@ -752,6 +748,69 @@ window.OGSGolf.state.createRoundState = function createRoundState(
 
     savedHoleResults[currentHoleIndex] = holeResults;
     recalculateSkins();
+  }
+
+  function applyCloudHoleScores(scoreRows = []) {
+    scoreRows.forEach((scoreRow) => {
+      const player = players.find((item) => item.id === scoreRow.player_id);
+      const holeIndex = Number(scoreRow.hole) - 1;
+
+      if (!player || holeIndex < 0 || holeIndex >= totalHoles) return;
+
+      const grossScore = Number(scoreRow.gross);
+      const strokesReceived = Number(scoreRow.strokes_received || 0);
+      const netScore = Number(scoreRow.net ?? grossScore - strokesReceived);
+      const skinScore = getSkinScore(grossScore, strokesReceived);
+      const existingHoleResults = savedHoleResults[holeIndex] || [];
+
+      savedScores[player.id][holeIndex] = grossScore;
+      savedHoleResults[holeIndex] = [
+        ...existingHoleResults.filter((result) => result.playerId !== player.id),
+        {
+          playerId: player.id,
+          grossScore,
+          strokesReceived,
+          netScore,
+          skinScore
+        }
+      ];
+    });
+
+    recalculateSkins();
+    loadDraftScores();
+  }
+
+  function replaceSavedScoresFromCloud(scoreRows = []) {
+    players.forEach((player) => {
+      savedScores[player.id] = Array(totalHoles).fill(null);
+    });
+    savedHoleResults = Array(totalHoles).fill(null);
+    applyCloudHoleScores(scoreRows);
+  }
+
+  function applyCloudPlayerStatuses(statusRows = []) {
+    if (statusRows.length === 0) {
+      roundSettings.playerStatuses = playerStatuses;
+      return;
+    }
+
+    Object.keys(playerStatuses).forEach((playerId) => {
+      delete playerStatuses[playerId];
+    });
+
+    statusRows.forEach((statusRow) => {
+      if (statusRow.status !== "dnf") return;
+
+      playerStatuses[statusRow.player_id] = {
+        status: "dnf",
+        holesCompleted: Number(statusRow.holes_completed || 0),
+        grossStrokes: Number(statusRow.gross_strokes || 0),
+        reason: statusRow.reason || "",
+        markedAt: statusRow.updated_at || statusRow.created_at || new Date().toISOString()
+      };
+    });
+
+    roundSettings.playerStatuses = playerStatuses;
   }
 
   function clearHoleForPlayers(holeIndex, playersToClear = players) {
@@ -855,6 +914,9 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     getAutoSaveExport,
     changeDraftScore,
     saveCurrentHole,
+    applyCloudHoleScores,
+    replaceSavedScoresFromCloud,
+    applyCloudPlayerStatuses,
     markPlayerDnf,
     restorePlayerActive,
     clearHoleForPlayers,

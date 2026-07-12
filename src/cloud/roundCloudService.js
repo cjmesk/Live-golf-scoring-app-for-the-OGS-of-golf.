@@ -389,3 +389,429 @@ window.OGSGolf.cloud.roundCloudService.deletePlayer = async function deletePlaye
     };
   }
 };
+
+window.OGSGolf.cloud.roundCloudService.fetchCurrentActiveRoundRecord = async function fetchCurrentActiveRoundRecord() {
+  const config = window.OGSGolf.cloud.supabaseConfig;
+
+  if (!config.url || !config.anonKey) {
+    return { ok: false, reason: "not-configured", round: null };
+  }
+
+  try {
+    const response = await fetch(
+      `${config.url}/rest/v1/rounds?select=*&completed=eq.false&order=played_at.desc&limit=1`,
+      {
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`
+        }
+      }
+    );
+
+    if (!response.ok) throw new Error("Active round fetch failed.");
+
+    const rows = await response.json();
+    return {
+      ok: true,
+      round: rows[0] || null
+    };
+  } catch (error) {
+    return { ok: false, reason: "failed", round: null, message: "Active round fetch failed." };
+  }
+};
+
+window.OGSGolf.cloud.roundCloudService.fetchRoundGroups = async function fetchRoundGroups(roundId) {
+  const config = window.OGSGolf.cloud.supabaseConfig;
+
+  if (!config.url || !config.anonKey) {
+    return { ok: false, reason: "not-configured", groups: [] };
+  }
+
+  try {
+    const response = await fetch(
+      `${config.url}/rest/v1/round_groups?select=*&round_id=eq.${encodeURIComponent(roundId)}&order=group_number.asc`,
+      {
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`
+        }
+      }
+    );
+
+    if (!response.ok) throw new Error("Round groups fetch failed.");
+
+    return { ok: true, groups: await response.json() };
+  } catch (error) {
+    return { ok: false, reason: "failed", groups: [], message: "Round groups fetch failed." };
+  }
+};
+
+window.OGSGolf.cloud.roundCloudService.fetchRoundPlayers = async function fetchRoundPlayers(roundId) {
+  const config = window.OGSGolf.cloud.supabaseConfig;
+
+  if (!config.url || !config.anonKey) {
+    return { ok: false, reason: "not-configured", players: [] };
+  }
+
+  try {
+    const response = await fetch(
+      `${config.url}/rest/v1/round_players?select=*&round_id=eq.${encodeURIComponent(roundId)}&order=player_id.asc`,
+      {
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`
+        }
+      }
+    );
+
+    if (!response.ok) throw new Error("Round players fetch failed.");
+
+    return { ok: true, players: await response.json() };
+  } catch (error) {
+    return { ok: false, reason: "failed", players: [], message: "Round players fetch failed." };
+  }
+};
+
+window.OGSGolf.cloud.roundCloudService.fetchHoleScores = async function fetchHoleScores(roundId) {
+  const config = window.OGSGolf.cloud.supabaseConfig;
+
+  if (!config.url || !config.anonKey) {
+    return { ok: false, reason: "not-configured", scores: [] };
+  }
+
+  try {
+    const response = await fetch(
+      `${config.url}/rest/v1/hole_scores?select=*&round_id=eq.${encodeURIComponent(roundId)}&order=group_id.asc,hole.asc,player_id.asc`,
+      {
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`
+        }
+      }
+    );
+
+    if (!response.ok) throw new Error("Hole scores fetch failed.");
+
+    return { ok: true, scores: await response.json() };
+  } catch (error) {
+    return { ok: false, reason: "failed", scores: [], message: "Hole scores fetch failed." };
+  }
+};
+
+window.OGSGolf.cloud.roundCloudService.fetchPlayerStatuses = async function fetchPlayerStatuses(roundId) {
+  const config = window.OGSGolf.cloud.supabaseConfig;
+
+  if (!config.url || !config.anonKey) {
+    return { ok: false, reason: "not-configured", statuses: [] };
+  }
+
+  try {
+    const response = await fetch(
+      `${config.url}/rest/v1/player_statuses?select=*&round_id=eq.${encodeURIComponent(roundId)}&order=player_id.asc`,
+      {
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`
+        }
+      }
+    );
+
+    if (!response.ok) throw new Error("Player statuses fetch failed.");
+
+    return { ok: true, statuses: await response.json() };
+  } catch (error) {
+    return { ok: false, reason: "failed", statuses: [], message: "Player statuses fetch failed." };
+  }
+};
+
+window.OGSGolf.cloud.roundCloudService.validateHoleScoreRow = function validateHoleScoreRow(score) {
+  const hole = Number(score.hole);
+  const gross = Number(score.gross);
+  const strokesReceived = Number(score.strokes_received ?? score.strokesReceived ?? 0);
+  const net = Number(score.net ?? gross - strokesReceived);
+
+  if (!score.round_id || !score.player_id) {
+    return { ok: false, message: "Score needs round_id and player_id." };
+  }
+
+  if (!Number.isInteger(hole) || hole < 1 || hole > 18) {
+    return { ok: false, message: "Hole must be between 1 and 18." };
+  }
+
+  if (!Number.isFinite(gross) || gross <= 0) {
+    return { ok: false, message: "Gross score must be a positive number." };
+  }
+
+  if (net !== gross - strokesReceived) {
+    return { ok: false, message: "Net must equal gross minus strokes received." };
+  }
+
+  return { ok: true };
+};
+
+window.OGSGolf.cloud.roundCloudService.upsertPlayerHoleScore = async function upsertPlayerHoleScore(score) {
+  const config = window.OGSGolf.cloud.supabaseConfig;
+  const validation = this.validateHoleScoreRow(score);
+
+  if (!validation.ok) {
+    return { ok: false, reason: "invalid-score", message: validation.message };
+  }
+
+  if (!config.url || !config.anonKey) {
+    return { ok: false, reason: "not-configured", message: "Supabase is not configured." };
+  }
+
+  const gross = Number(score.gross);
+  const strokesReceived = Number(score.strokes_received ?? score.strokesReceived ?? 0);
+  const row = {
+    round_id: score.round_id,
+    group_id: score.group_id || null,
+    player_id: score.player_id,
+    hole: Number(score.hole),
+    gross,
+    strokes_received: strokesReceived,
+    net: gross - strokesReceived,
+    updated_by: score.updated_by || null
+  };
+
+  try {
+    const response = await fetch(`${config.url}/rest/v1/hole_scores?on_conflict=round_id,player_id,hole`, {
+      method: "POST",
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.anonKey}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation"
+      },
+      body: JSON.stringify(row)
+    });
+
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(details || "Hole score upsert failed.");
+    }
+
+    return { ok: true, score: (await response.json())[0] || row };
+  } catch (error) {
+    return { ok: false, reason: "failed", message: `Hole score upsert failed. ${error.message || ""}`.trim() };
+  }
+};
+
+window.OGSGolf.cloud.roundCloudService.upsertRoundGroup = async function upsertRoundGroup(group) {
+  const config = window.OGSGolf.cloud.supabaseConfig;
+
+  if (!config.url || !config.anonKey) {
+    return { ok: false, reason: "not-configured", message: "Supabase is not configured." };
+  }
+
+  const row = {
+    id: group.id,
+    round_id: group.round_id,
+    group_number: Number(group.group_number),
+    starting_hole: Number(group.starting_hole || 1),
+    holes_to_play: Number(group.holes_to_play || 18),
+    status: group.status || "in_progress",
+    completed_at: group.completed_at || null
+  };
+
+  try {
+    const response = await fetch(`${config.url}/rest/v1/round_groups?on_conflict=round_id,group_number`, {
+      method: "POST",
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.anonKey}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation"
+      },
+      body: JSON.stringify(row)
+    });
+
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(details || "Round group upsert failed.");
+    }
+
+    return { ok: true, group: (await response.json())[0] || row };
+  } catch (error) {
+    return { ok: false, reason: "failed", message: `Round group upsert failed. ${error.message || ""}`.trim() };
+  }
+};
+
+window.OGSGolf.cloud.roundCloudService.upsertGroupHoleScores = async function upsertGroupHoleScores({
+  roundId,
+  groupId,
+  hole,
+  scores,
+  updatedBy
+}) {
+  const results = [];
+
+  for (const score of scores) {
+    const result = await this.upsertPlayerHoleScore({
+      round_id: roundId,
+      group_id: groupId,
+      player_id: score.playerId || score.player_id,
+      hole,
+      gross: score.gross,
+      strokes_received: score.strokesReceived ?? score.strokes_received ?? 0,
+      updated_by: updatedBy
+    });
+
+    if (!result.ok) {
+      return result;
+    }
+
+    results.push(result.score);
+  }
+
+  return { ok: true, scores: results };
+};
+
+window.OGSGolf.cloud.roundCloudService.fetchGroupHoleScores = async function fetchGroupHoleScores({
+  roundId,
+  groupId,
+  hole
+}) {
+  const config = window.OGSGolf.cloud.supabaseConfig;
+
+  if (!config.url || !config.anonKey) {
+    return { ok: false, reason: "not-configured", scores: [] };
+  }
+
+  try {
+    const response = await fetch(
+      `${config.url}/rest/v1/hole_scores?select=*&round_id=eq.${encodeURIComponent(roundId)}&group_id=eq.${encodeURIComponent(groupId)}&hole=eq.${Number(hole)}&order=player_id.asc`,
+      {
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(details || "Group hole scores fetch failed.");
+    }
+
+    return { ok: true, scores: await response.json() };
+  } catch (error) {
+    return { ok: false, reason: "failed", scores: [], message: `Group hole scores fetch failed. ${error.message || ""}`.trim() };
+  }
+};
+
+window.OGSGolf.cloud.roundCloudService.updateRoundGroupStatus = async function updateRoundGroupStatus({
+  groupId,
+  status,
+  completedAt = null
+}) {
+  const config = window.OGSGolf.cloud.supabaseConfig;
+
+  if (!config.url || !config.anonKey) {
+    return { ok: false, reason: "not-configured", message: "Supabase is not configured." };
+  }
+
+  if (!["not_started", "in_progress", "completed"].includes(status)) {
+    return { ok: false, reason: "invalid-status", message: "Invalid group status." };
+  }
+
+  try {
+    const response = await fetch(`${config.url}/rest/v1/round_groups?id=eq.${encodeURIComponent(groupId)}`, {
+      method: "PATCH",
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.anonKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({
+        status,
+        completed_at: status === "completed" ? (completedAt || new Date().toISOString()) : null
+      })
+    });
+
+    if (!response.ok) throw new Error("Group status update failed.");
+
+    return { ok: true, group: (await response.json())[0] || null };
+  } catch (error) {
+    return { ok: false, reason: "failed", message: "Group status update failed." };
+  }
+};
+
+window.OGSGolf.cloud.roundCloudService.getGroupCompletionFromScoreRows = function getGroupCompletionFromScoreRows({
+  group,
+  players,
+  scores,
+  statuses
+}) {
+  const requiredHoles = Number(group.holes_to_play || group.holesToPlay || 18);
+  const startHole = Number(group.starting_hole || group.startingHole || 1);
+  const holeSequence = Array.from({ length: requiredHoles }, (_, index) =>
+    ((startHole - 1 + index) % 18) + 1
+  );
+  const dnfPlayerIds = new Set(
+    (statuses || [])
+      .filter((status) => status.status === "dnf")
+      .map((status) => status.player_id)
+  );
+  const activePlayers = (players || []).filter((player) =>
+    player.playing !== false && !dnfPlayerIds.has(player.player_id)
+  );
+  const scoreKeys = new Set((scores || []).map((score) =>
+    `${score.player_id}:${Number(score.hole)}`
+  ));
+  const completedHoleNumbers = holeSequence.filter((holeNumber) =>
+    activePlayers.every((player) => scoreKeys.has(`${player.player_id}:${holeNumber}`))
+  );
+
+  return {
+    completedHoleNumbers,
+    completedCount: completedHoleNumbers.length,
+    requiredHoles,
+    complete: completedHoleNumbers.length >= requiredHoles
+  };
+};
+
+window.OGSGolf.cloud.roundCloudService.markRoundCompletedIfAllGroupsComplete = async function markRoundCompletedIfAllGroupsComplete(roundId) {
+  const groupsResult = await this.fetchRoundGroups(roundId);
+  const playersResult = await this.fetchRoundPlayers(roundId);
+  const scoresResult = await this.fetchHoleScores(roundId);
+  const statusesResult = await this.fetchPlayerStatuses(roundId);
+
+  if (!groupsResult.ok || !playersResult.ok || !scoresResult.ok || !statusesResult.ok) {
+    return { ok: false, reason: "fetch-failed", completed: false };
+  }
+
+  const groupChecks = groupsResult.groups.map((group) => this.getGroupCompletionFromScoreRows({
+    group,
+    players: playersResult.players.filter((player) => player.group_id === group.id),
+    scores: scoresResult.scores.filter((score) => score.group_id === group.id),
+    statuses: statusesResult.statuses
+  }));
+  const allGroupsComplete = groupChecks.length > 0 && groupChecks.every((check) => check.complete);
+
+  if (!allGroupsComplete) {
+    return { ok: true, completed: false, groupChecks };
+  }
+
+  const config = window.OGSGolf.cloud.supabaseConfig;
+
+  try {
+    const response = await fetch(`${config.url}/rest/v1/rounds?id=eq.${encodeURIComponent(roundId)}`, {
+      method: "PATCH",
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.anonKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({ completed: true })
+    });
+
+    if (!response.ok) throw new Error("Round completion update failed.");
+
+    return { ok: true, completed: true, groupChecks };
+  } catch (error) {
+    return { ok: false, reason: "failed", completed: false, groupChecks };
+  }
+};

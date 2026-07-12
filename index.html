@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OG&apos;s Golf</title>
-      <link rel="stylesheet" href="src/styles/main.css?v=20260711-cloud-roster-save">
+      <link rel="stylesheet" href="src/styles/main.css?v=20260712-phase2b-cloud-first">
 </head>
 <body>
   <header class="app-header">
@@ -211,7 +211,9 @@
       <nav class="score-nav" aria-label="Round navigation">
         <button id="scoreMyGroup" type="button" class="secondary-button">Score My Group</button>
         <button id="viewOverallLeaderboard" type="button" class="secondary-button">Leaderboard</button>
+        <button id="refreshLiveScores" type="button" class="secondary-button">Live Refresh</button>
         <button id="changeScorerQuick" type="button" class="secondary-button">Not you? Change scorer</button>
+        <div id="liveRefreshStatus" class="cloud-save-status live-refresh-status"></div>
       </nav>
 
       <section class="hole-section" aria-labelledby="holeTitle">
@@ -466,7 +468,7 @@
       </div>
       <div class="setup-panel">
         <strong>Game buy-ins are set during the setup wizard.</strong>
-        <span class="player-details">Open New Round / Setup Wizard to choose Points, Net Skins, Team Event, Closest to Pin, Long Drive, and dollar amounts.</span>
+        <span class="player-details">Open New Round / Setup Wizard to choose Points, Net Skins, Team Event, and dollar amounts.</span>
       </div>
     </section>
 
@@ -506,17 +508,17 @@
   <script src="src/rules/skins.js?v=20260709-v098-menu"></script>
   <script src="src/state/playerStorage.js?v=20260709-v098-menu"></script>
   <script src="src/state/scorerStorage.js?v=20260711-device-scorer"></script>
-  <script src="src/state/roundState.js?v=20260711-dnf"></script>
+  <script src="src/state/roundState.js?v=20260712-phase2b-cloud-first"></script>
   <script src="src/state/roundStorage.js?v=20260709-v098-menu"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="src/cloud/supabaseConfig.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/supabaseClient.js?v=20260709-v098-menu"></script>
-  <script src="src/cloud/roundCloudService.js?v=20260711-cloud-roster-save"></script>
-  <script src="src/ui/dom.js?v=20260711-device-scorer"></script>
+  <script src="src/cloud/roundCloudService.js?v=20260712-phase2b-cloud-first"></script>
+  <script src="src/ui/dom.js?v=20260712-phase2b-cloud-first"></script>
   <script src="src/ui/formatters.js?v=20260710-index-course-handicap"></script>
-  <script src="src/ui/setupView.js?v=20260710-round-setup"></script>
+  <script src="src/ui/setupView.js?v=20260712-phase2b-cloud-first"></script>
   <script src="src/ui/holeView.js?v=20260711-dnf-options"></script>
-  <script src="src/ui/leaderboardView.js?v=20260711-gross-hole-count"></script>
+  <script src="src/ui/leaderboardView.js?v=20260712-phase2b-cloud-first"></script>
   <script src="src/ui/pointsPayoutView.js?v=20260710-points-quota"></script>
   <script src="src/ui/skinsView.js?v=20260709-v098-menu"></script>
   <script src="src/ui/finalSummaryView.js?v=20260711-dnf"></script>
@@ -524,6 +526,6 @@
   <script src="src/ui/playerManagementView.js?v=20260711-cloud-roster-save"></script>
   <script src="src/ui/groupSetupView.js?v=20260710-flex-hole-order"></script>
   <script src="src/ui/eventSummaryView.js?v=20260710-round-setup"></script>
-  <script src="src/app.js?v=20260711-cloud-roster-save"></script>
+  <script src="src/app.js?v=20260712-phase2b-cloud-first"></script>
 </body>
 </html>
