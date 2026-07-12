@@ -659,6 +659,7 @@ body.is-scoring .current-hole-status {
 .score-value {
   display: grid;
   place-items: center;
+  width: 100%;
   min-height: 60px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -666,6 +667,8 @@ body.is-scoring .current-hole-status {
   background: #fafbf9;
   font-size: 2rem;
   font-weight: 800;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .course-table-wrap {
@@ -765,6 +768,39 @@ body.is-scoring .current-hole-status {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-top: 12px;
+}
+
+.save-confirmation {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fafbf9;
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.save-confirmation:empty {
+  display: none;
+}
+
+.save-confirmation-title {
+  color: var(--ink);
+}
+
+.save-confirmation-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+}
+
+.save-confirmation-row strong,
+.save-confirmation-row span {
+  min-width: 0;
 }
 
 .group-nav-row,

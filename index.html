@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OG&apos;s Golf</title>
-      <link rel="stylesheet" href="src/styles/main.css?v=20260712-phase2b-cloud-first">
+      <link rel="stylesheet" href="src/styles/main.css?v=20260712-hole-result-confirmation">
 </head>
 <body>
   <header class="app-header">
@@ -268,6 +268,7 @@
         <button id="nextHole" type="button" class="secondary-button">Next Hole</button>
         <button id="undoLastHole" type="button" class="secondary-button">Undo Last Hole</button>
       </div>
+      <div id="saveConfirmation" class="save-confirmation"></div>
       <div id="groupCompletionSummary" class="cloud-save-status is-hidden"></div>
       <div id="completedGroupPanel" class="completed-group-panel is-hidden">
         <div class="setup-header">
@@ -503,22 +504,22 @@
 
   <script src="src/data/course.js?v=20260710-tee-handicap"></script>
   <script src="src/data/players.js?v=20260709-v098-menu"></script>
-  <script src="src/rules/points.js?v=20260709-v098-menu"></script>
+  <script src="src/rules/points.js?v=20260712-hole-result-confirmation"></script>
   <script src="src/rules/handicap.js?v=20260710-handicap-verify"></script>
   <script src="src/rules/skins.js?v=20260709-v098-menu"></script>
   <script src="src/state/playerStorage.js?v=20260709-v098-menu"></script>
   <script src="src/state/scorerStorage.js?v=20260711-device-scorer"></script>
-  <script src="src/state/roundState.js?v=20260712-phase2b-cloud-first"></script>
+  <script src="src/state/roundState.js?v=20260712-direct-score-gross-fix"></script>
   <script src="src/state/roundStorage.js?v=20260709-v098-menu"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="src/cloud/supabaseConfig.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/supabaseClient.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/roundCloudService.js?v=20260712-phase2b-cloud-first"></script>
-  <script src="src/ui/dom.js?v=20260712-phase2b-cloud-first"></script>
+  <script src="src/ui/dom.js?v=20260712-hole-result-confirmation"></script>
   <script src="src/ui/formatters.js?v=20260710-index-course-handicap"></script>
   <script src="src/ui/setupView.js?v=20260712-phase2b-cloud-first"></script>
-  <script src="src/ui/holeView.js?v=20260711-dnf-options"></script>
-  <script src="src/ui/leaderboardView.js?v=20260712-phase2b-cloud-first"></script>
+  <script src="src/ui/holeView.js?v=20260712-direct-score-gross-fix"></script>
+  <script src="src/ui/leaderboardView.js?v=20260712-leaderboard-to-par"></script>
   <script src="src/ui/pointsPayoutView.js?v=20260710-points-quota"></script>
   <script src="src/ui/skinsView.js?v=20260709-v098-menu"></script>
   <script src="src/ui/finalSummaryView.js?v=20260711-dnf"></script>
@@ -526,6 +527,6 @@
   <script src="src/ui/playerManagementView.js?v=20260711-cloud-roster-save"></script>
   <script src="src/ui/groupSetupView.js?v=20260710-flex-hole-order"></script>
   <script src="src/ui/eventSummaryView.js?v=20260710-round-setup"></script>
-  <script src="src/app.js?v=20260712-phase2b-cloud-first"></script>
+  <script src="src/app.js?v=20260712-clear-group-save-recap"></script>
 </body>
 </html>

@@ -4,6 +4,39 @@ window.OGSGolf.ui = window.OGSGolf.ui || {};
 window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, players, roundState) {
   const pointsEnabled = roundState.roundSettings.games.pointsGame.enabled;
   const totalHoles = roundState.totalHoles || 18;
+
+  function isSavedScore(score) {
+    const numericScore = Number(score);
+    return score !== null
+      && score !== undefined
+      && score !== ""
+      && Number.isFinite(numericScore)
+      && numericScore > 0;
+  }
+
+  function getScoreToPar(player) {
+    const savedScores = roundState.savedScores[player.id] || [];
+    const savedHoles = savedScores
+      .map((score, index) => ({ score, index }))
+      .filter((item) => isSavedScore(item.score));
+    const actualStrokes = savedHoles.reduce((total, item) => total + Number(item.score), 0);
+    const parForSavedHoles = savedHoles.reduce(
+      (total, item) => total + Number(roundState.getHoleForPlayer(player, item.index).par),
+      0
+    );
+    const toPar = actualStrokes - parForSavedHoles;
+
+    return {
+      actualStrokes,
+      holesCompleted: savedHoles.length,
+      display: savedHoles.length === 0
+        ? "-"
+        : toPar === 0
+          ? "Even"
+          : `${toPar > 0 ? "+" : ""}${toPar} to par`
+    };
+  }
+
   const standings = players
     .map((player) => ({
       player,
@@ -35,9 +68,7 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
     const frontPointsResult = roundState.getPointsDifferential(player, "front");
     const backPointsResult = roundState.getPointsDifferential(player, "back");
     const overallPointsResult = standing.pointsResult;
-    const frontGrossText = roundState.formatGrossTotal(totals, "front");
-    const backGrossText = roundState.formatGrossTotal(totals, "back");
-    const overallGrossText = roundState.formatGrossTotal(totals, "overall");
+    const scoreToPar = getScoreToPar(player);
     const gameStatus = [
       roundState.isInSkins(player) ? "Skins" : "Not in Skins",
       roundState.isInPoints(player) ? "Points" : "Not in Points",
@@ -60,9 +91,9 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
         ${!isDnf && pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">Quota ${frontPointsResult.quota} per side / ${overallPointsResult.target} overall</span>` : ""}
         ${!isDnf && pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">${totals.points} pts earned</span>` : ""}
         ${!isDnf && pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">Front ${frontPointsResult.display} | Back ${backPointsResult.display}</span>` : ""}
-        <span class="gross">${overallGrossText}</span>
-        <span class="gross">${frontGrossText} | ${backGrossText}</span>
-        <span class="gross">${isDnf ? "Excluded from full-round results" : `Net ${totals.net || "-"}`}</span>
+        <span class="gross">Strokes ${scoreToPar.holesCompleted === 0 ? "-" : scoreToPar.actualStrokes}</span>
+        <span class="gross">${scoreToPar.holesCompleted}/${totalHoles} holes</span>
+        <span class="gross">${scoreToPar.display}</span>
       </div>
     `;
     elements.leaderboard.appendChild(row);

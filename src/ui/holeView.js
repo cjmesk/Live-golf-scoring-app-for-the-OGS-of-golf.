@@ -37,7 +37,7 @@ window.OGSGolf.ui.renderHoleView = function renderHoleView(elements, course, pla
       ${isDnf ? "" : `
         <div class="score-stepper" aria-label="${player.name} gross score controls">
           <button type="button" class="step-button" data-action="decrease" data-player-id="${player.id}" aria-label="Decrease ${player.name} score">-</button>
-          <output class="score-value" id="${player.id}-score">${score}</output>
+          <input class="score-value score-input" id="${player.id}-score" data-score-input data-player-id="${player.id}" type="number" inputmode="numeric" min="1" max="12" value="${score}" aria-label="${player.name} gross score">
           <button type="button" class="step-button" data-action="increase" data-player-id="${player.id}" aria-label="Increase ${player.name} score">+</button>
         </div>
       `}

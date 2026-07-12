@@ -1,6 +1,7 @@
 const { courses, players: defaultPlayers, maxRosterSize } = window.OGSGolf.data;
 const { createRoundState, playerStorage, roundStorage, scorerStorage } = window.OGSGolf.state;
 const { roundCloudService } = window.OGSGolf.cloud;
+const { getHoleResult } = window.OGSGolf.rules;
 const {
   clearPlayerForm,
   fillPlayerForm,
@@ -75,6 +76,21 @@ function scrollToTop() {
 
 function scrollToScoring() {
   elements.holePlayers.scrollIntoView({ behavior: "auto", block: "start" });
+}
+
+function clearSaveConfirmation() {
+  if (elements.saveConfirmation) {
+    elements.saveConfirmation.innerHTML = "";
+  }
+}
+
+function escapeText(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function getCurrentScorerName() {
@@ -413,6 +429,7 @@ function renderHandicapVerification() {
 function setCommissionerMode(isOn) {
   commissionerMode = isOn;
   currentScorerId = isOn ? null : currentScorerId;
+  clearSaveConfirmation();
 
   if (isOn) {
     clearScorerForCurrentRound();
@@ -1155,7 +1172,11 @@ function goToGroup(nextGroupIndex) {
   if (!roundSettings) return;
   if (!commissionerMode && roundSettings.groupScorers?.[nextGroupIndex] !== currentScorerId) return;
 
+  const previousGroupIndex = currentGroupIndex;
   currentGroupIndex = Math.max(0, Math.min(roundSettings.groups.length - 1, nextGroupIndex));
+  if (currentGroupIndex !== previousGroupIndex) {
+    clearSaveConfirmation();
+  }
   syncRoundStateToCurrentGroup();
   renderApp();
   scrollToScoring();
@@ -1215,7 +1236,11 @@ function showScoreMyGroup() {
   }
 
   if (!commissionerMode && !viewOnlyMode && currentScorerId) {
+    const previousGroupIndex = currentGroupIndex;
     currentGroupIndex = getAssignedGroupIndex(currentScorerId);
+    if (currentGroupIndex !== previousGroupIndex) {
+      clearSaveConfirmation();
+    }
     syncRoundStateToCurrentGroup();
     renderCurrentHole();
   }
@@ -1253,6 +1278,7 @@ function canEditCurrentGroup() {
 }
 
 function renderScorerSelection() {
+  clearSaveConfirmation();
   const assignedScorerIds = roundSettings?.groupScorers
     ? Array.from(new Set(roundSettings.groupScorers.filter(Boolean)))
     : [];
@@ -1302,7 +1328,11 @@ function continueFromTodayRound() {
         return;
       }
 
+      const previousGroupIndex = currentGroupIndex;
       currentGroupIndex = getAssignedGroupIndex(currentScorerId);
+      if (currentGroupIndex !== previousGroupIndex) {
+        clearSaveConfirmation();
+      }
       syncRoundStateToCurrentGroup();
       setActiveScreen("round");
       renderApp();
@@ -1333,6 +1363,7 @@ function viewLiveMatch() {
   }
 
   viewOnlyMode = true;
+  clearSaveConfirmation();
   setActiveScreen("round");
   renderApp();
   showLeaderboardPage();
@@ -1382,6 +1413,7 @@ function enterScorer(playerId) {
   viewOnlyMode = false;
   scorerStorage.saveScorerId(playerId, getCurrentRoundId());
   scorerStorage.setCommissionerMode(false);
+  clearSaveConfirmation();
 
   if (roundState) {
     currentGroupIndex = getAssignedGroupIndex(playerId);
@@ -1437,6 +1469,48 @@ function buildCloudScorePayload(playersToScore, holeNumber, groupIndex) {
       strokesReceived
     };
   });
+}
+
+function getDisplayedScoreValue(playerId) {
+  const input = Array.from(elements.holePlayers.querySelectorAll("[data-score-input]"))
+    .find((scoreInput) => scoreInput.dataset.playerId === playerId);
+
+  return input ? input.value : "";
+}
+
+function syncDraftScoresFromDisplayedInputs(playersToScore) {
+  playersToScore.forEach((player) => {
+    const displayedScore = getDisplayedScoreValue(player.id);
+
+    if (displayedScore !== "") {
+      roundState.setDraftScore(player.id, displayedScore);
+    }
+  });
+}
+
+function renderSaveConfirmation({ holeNumber, groupIndex, playersToScore, savedScores }) {
+  if (!elements.saveConfirmation) return;
+  if (groupIndex !== currentGroupIndex) return;
+
+  const savedByPlayer = new Map(savedScores.map((score) => [score.player_id, score]));
+
+  elements.saveConfirmation.innerHTML = `
+    <strong class="save-confirmation-title">\u2713 Hole ${holeNumber} Saved</strong>
+    ${playersToScore.map((player) => {
+      const savedScore = savedByPlayer.get(player.id);
+      const gross = Number(savedScore?.gross);
+      const hole = roundState.getHoleForPlayer(player, holeNumber - 1);
+      const par = Number(hole?.par);
+      const result = getHoleResult(gross, par);
+
+      return `
+        <div class="save-confirmation-row">
+          <strong>${escapeText(player.name)}</strong>
+          <span>${escapeText(result)} (${gross})</span>
+        </div>
+      `;
+    }).join("")}
+  `;
 }
 
 function logBetaSaveHole(eventName, details) {
@@ -2422,6 +2496,16 @@ elements.holePlayers.addEventListener("click", (event) => {
   roundState.changeDraftScore(button.dataset.playerId, amount);
   renderCurrentHole();
 });
+elements.holePlayers.addEventListener("input", (event) => {
+  if (!roundState) return;
+  if (!canEditCurrentGroup()) return;
+
+  const input = event.target.closest("[data-score-input]");
+
+  if (!input) return;
+
+  roundState.setDraftScore(input.dataset.playerId, input.value);
+});
 elements.cancelDnf.addEventListener("click", closeDnfConfirmation);
 elements.confirmDnf.addEventListener("click", confirmPlayerDnf);
 
@@ -2493,6 +2577,7 @@ elements.saveHole.addEventListener("click", async () => {
   syncRoundStateToCurrentGroup();
   const groupPlayers = getCurrentGroupPlayers();
   const playersToScore = groupPlayers.filter((player) => !roundState.isPlayerDnf(player));
+  syncDraftScoresFromDisplayedInputs(playersToScore);
   const hasInvalidScore = playersToScore.some((player) => {
     const score = roundState.draftScores[player.id];
     return !Number.isFinite(Number(score)) || Number(score) < 1;
@@ -2555,6 +2640,21 @@ elements.saveHole.addEventListener("click", async () => {
     loadSavedRoundIntoState(mergedRound);
     roundState.applyCloudHoleScores(cloudSaveResult.scores);
   }
+
+  const liveTotalsResult = await applyCloudScoreStateForActiveRound(roundState.id);
+
+  if (!liveTotalsResult.ok) {
+    elements.liveRefreshStatus.textContent =
+      "Saved. Live leaderboard refresh failed, showing this device's saved copy.";
+  }
+
+  renderSaveConfirmation({
+    holeNumber: savedHoleNumber,
+    groupIndex: savedGroupIndex,
+    playersToScore,
+    savedScores: cloudSaveResult.scores
+  });
+
   const fullRoundCompleted = await completeFullRoundIfReady("after-save-hole");
 
   if (fullRoundCompleted) {

@@ -89,25 +89,35 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     });
   }
 
+  function isSavedGrossScore(score) {
+    const numericScore = Number(score);
+    return score !== null
+      && score !== undefined
+      && score !== ""
+      && Number.isFinite(numericScore)
+      && numericScore > 0;
+  }
+
   function getPlayerTotals(player) {
     return savedScores[player.id].reduce(
       (totals, score, index) => {
-        if (score !== null) {
+        if (isSavedGrossScore(score)) {
+          const grossScore = Number(score);
           const par = getHoleForPlayer(player, index).par;
-          const points = getPoints(score, par);
+          const points = getPoints(grossScore, par);
           const holeResult = savedHoleResults[index]?.find(
             (result) => result.playerId === player.id
           );
           const strokesReceived = getStrokesForPlayerOnHole(player, index);
-          const netScore = holeResult?.netScore ?? getNetScore(score, strokesReceived);
-          totals.gross += Number(score);
+          const netScore = holeResult?.netScore ?? getNetScore(grossScore, strokesReceived);
+          totals.gross += grossScore;
           totals.net += Number(netScore);
           totals.holesPlayed += 1;
           if (index < 9) {
-            totals.frontGross += Number(score);
+            totals.frontGross += grossScore;
             totals.frontGrossHoles += 1;
           } else {
-            totals.backGross += Number(score);
+            totals.backGross += grossScore;
             totals.backGrossHoles += 1;
           }
           if (isInPoints(player)) {
@@ -143,6 +153,15 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         overallPointsTarget: getPointsQuota(player) * 2
       }
     );
+  }
+
+  function getSavedGrossRecordsForPlayer(player) {
+    return (savedScores[player.id] || [])
+      .map((score, index) => ({
+        hole: index + 1,
+        gross: isSavedGrossScore(score) ? Number(score) : null
+      }))
+      .filter((record) => record.gross !== null);
   }
 
   function formatGrossTotal(totals, section = "overall") {
@@ -718,8 +737,16 @@ window.OGSGolf.state.createRoundState = function createRoundState(
   }
 
   function changeDraftScore(playerId, amount) {
-    const nextScore = draftScores[playerId] + amount;
+    const nextScore = Number(draftScores[playerId]) + amount;
     draftScores[playerId] = Math.max(1, Math.min(12, nextScore));
+  }
+
+  function setDraftScore(playerId, value) {
+    const nextScore = Number(value);
+
+    if (!Number.isFinite(nextScore)) return;
+
+    draftScores[playerId] = Math.max(1, Math.min(12, Math.round(nextScore)));
   }
 
   function saveCurrentHole(playersToSave = players) {
@@ -893,6 +920,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     getHolePointsResults,
     getSkinForHole,
     getPlayerTotals,
+    getSavedGrossRecordsForPlayer,
     getPlayerDnfStatus,
     formatDnfStatus,
     formatGrossTotal,
@@ -913,6 +941,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     getRoundExport,
     getAutoSaveExport,
     changeDraftScore,
+    setDraftScore,
     saveCurrentHole,
     applyCloudHoleScores,
     replaceSavedScoresFromCloud,
