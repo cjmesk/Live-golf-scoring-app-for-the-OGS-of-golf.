@@ -94,6 +94,7 @@ window.OGSGolf.ui.getElements = function getElements() {
     viewOverallLeaderboard: document.querySelector("#viewOverallLeaderboard"),
     refreshLiveScores: document.querySelector("#refreshLiveScores"),
     liveRefreshStatus: document.querySelector("#liveRefreshStatus"),
+    activeRoundDiagnostics: document.querySelector("#activeRoundDiagnostics"),
     changeScorerLeaderboard: document.querySelector("#changeScorerLeaderboard"),
     saveStatusMessage: document.querySelector("#saveStatusMessage"),
     saveConfirmation: document.querySelector("#saveConfirmation"),

@@ -44,6 +44,12 @@ let pendingDnfPlayerId = null;
 let scoreOverrideOpen = false;
 let scoreOverrideActive = false;
 let scoreOverrideReturnGroupIndex = 0;
+let finalRoundSyncInFlight = false;
+let latestCloudActiveRoundInfo = {
+  id: "",
+  cloudUpdatedAt: "",
+  details: ""
+};
 
 function setActiveScreen(screenName) {
   const isScoringScreen = screenName === "round";
@@ -82,6 +88,21 @@ function clearSaveConfirmation() {
   if (elements.saveConfirmation) {
     elements.saveConfirmation.innerHTML = "";
   }
+}
+
+function renderActiveRoundDiagnostics({ loadedFrom = "" } = {}) {
+  if (!elements.activeRoundDiagnostics) return;
+
+  const localRound = roundStorage.getUnfinished();
+  const localRoundId = localRound?.id || "none";
+  const cloudRoundId = latestCloudActiveRoundInfo.id || "none";
+  const loadedRoundId = roundState?.id || "none";
+  const cloudUpdatedAt = latestCloudActiveRoundInfo.cloudUpdatedAt || "unknown";
+  const detailsText = latestCloudActiveRoundInfo.details ? ` | ${latestCloudActiveRoundInfo.details}` : "";
+  const loadedText = loadedFrom ? ` | Source: ${loadedFrom}` : "";
+
+  elements.activeRoundDiagnostics.textContent =
+    `Local round ID: ${localRoundId} | Cloud active round ID: ${cloudRoundId} | Loaded round ID: ${loadedRoundId} | Cloud updated time: ${cloudUpdatedAt}${detailsText}${loadedText}`;
 }
 
 function escapeText(value) {
@@ -972,56 +993,95 @@ function renderCompletedGroupPage() {
   elements.completedGroupPanel.classList.remove("is-hidden");
 }
 
+function getCompactPlayerLabels(players) {
+  const usedLabels = new Set();
+
+  return players.map((player) => {
+    const nameParts = player.name.split(/\s+/).filter(Boolean);
+    const firstName = nameParts[0] || player.name;
+    const lastName = nameParts[nameParts.length - 1] || "";
+    const candidates = [
+      `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase(),
+      `${firstName[0] || ""}${lastName.slice(0, 2)}`.toUpperCase(),
+      player.name.slice(0, 3).toUpperCase()
+    ].filter(Boolean);
+    let label = candidates.find((candidate) => !usedLabels.has(candidate));
+    let extraLetterCount = 3;
+
+    while (!label) {
+      const candidate = `${firstName[0] || ""}${lastName.slice(0, extraLetterCount)}`.toUpperCase();
+      if (!usedLabels.has(candidate)) {
+        label = candidate;
+      }
+      extraLetterCount += 1;
+    }
+
+    usedLabels.add(label);
+    return {
+      player,
+      label
+    };
+  });
+}
+
 function renderGroupScoreReview() {
   const sequence = getGroupHoleSequence(currentGroupIndex);
   const players = getCurrentGroupPlayers();
+  const playerLabels = getCompactPlayerLabels(players);
   const holeRows = sequence.map((holeNumber) => {
-    const scores = players
-      .map((player) => `<td>${roundState.savedScores[player.id][holeNumber - 1] ?? "-"}</td>`)
+    const scores = playerLabels
+      .map(({ player, label }) => `
+        <span class="group-review-score" title="${escapeText(player.name)}">
+          <b>${escapeText(label)}</b>
+          ${roundState.savedScores[player.id][holeNumber - 1] ?? "-"}
+        </span>
+      `)
       .join("");
 
-    return `<tr><td>Hole ${holeNumber}</td>${scores}</tr>`;
+    return `
+      <div class="group-review-row">
+        <strong>Hole ${holeNumber}</strong>
+        <div class="group-review-score-grid">${scores}</div>
+      </div>
+    `;
   }).join("");
-  const playerHeaders = players.map((player) => `<th>${player.name}</th>`).join("");
   const grossRows = getGroupGrossRows(currentGroupIndex);
   const firstRow = grossRows[0];
   const isNineHoleRound = firstRow?.isNineHoleRound;
   const nineLabel = firstRow?.nineLabel || "Nine";
-  const frontTotals = players.map((player) => {
-    const row = grossRows.find((grossRow) => grossRow.player.id === player.id);
-    return `<td>${row?.front || "-"}</td>`;
-  }).join("");
-  const backTotals = players.map((player) => {
-    const row = grossRows.find((grossRow) => grossRow.player.id === player.id);
-    return `<td>${row?.back || "-"}</td>`;
-  }).join("");
-  const grossTotals = players.map((player) => {
-    const row = grossRows.find((grossRow) => grossRow.player.id === player.id);
-    return `<td>${row?.gross ?? "-"}</td>`;
-  }).join("");
-  const nineTotals = players.map((player) => {
-    const row = grossRows.find((grossRow) => grossRow.player.id === player.id);
-    return `<td>${row?.gross ?? "-"}</td>`;
-  }).join("");
+
+  function renderTotalRow(label, valueGetter) {
+    const scores = playerLabels
+      .map(({ player, label: playerLabel }) => {
+        const row = grossRows.find((grossRow) => grossRow.player.id === player.id);
+        return `
+          <span class="group-review-score" title="${escapeText(player.name)}">
+            <b>${escapeText(playerLabel)}</b>
+            ${valueGetter(row)}
+          </span>
+        `;
+      })
+      .join("");
+
+    return `
+      <div class="group-review-row group-review-total-row">
+        <strong>${escapeText(label)}</strong>
+        <div class="group-review-score-grid">${scores}</div>
+      </div>
+    `;
+  }
 
   elements.groupScoreReview.innerHTML = `
     <h3>Review Group ${currentGroupIndex + 1} Scores</h3>
-    <div class="course-table-wrap">
-      <table class="course-info-table completed-score-table">
-        <thead>
-          <tr><th>Hole</th>${playerHeaders}</tr>
-        </thead>
-        <tbody>
-          ${holeRows}
-          ${isNineHoleRound
-            ? `<tr><td><strong>${nineLabel} Gross</strong></td>${nineTotals}</tr>`
-            : `
-              <tr><td><strong>Front Gross</strong></td>${frontTotals}</tr>
-              <tr><td><strong>Back Gross</strong></td>${backTotals}</tr>
-            `}
-          <tr><td><strong>Total Gross</strong></td>${grossTotals}</tr>
-        </tbody>
-      </table>
+    <div class="group-review-list">
+      ${holeRows}
+      ${isNineHoleRound
+        ? renderTotalRow(`${nineLabel} Gross`, (row) => row?.gross ?? "-")
+        : `
+          ${renderTotalRow("Front Gross", (row) => row?.front || "-")}
+          ${renderTotalRow("Back Gross", (row) => row?.back || "-")}
+        `}
+      ${renderTotalRow("Total Gross", (row) => row?.gross ?? "-")}
     </div>
   `;
   elements.groupScoreReview.classList.toggle("is-hidden");
@@ -1695,8 +1755,19 @@ async function autoSaveUnfinishedRound(savedGroupIndex, savedHoleIndex) {
   const cloudResult = await roundCloudService.loadActiveRound();
   const mergedData = mergeActiveRound(autoSaveData, cloudResult.round, savedGroupIndex, savedHoleIndex);
   roundStorage.saveUnfinished(mergedData);
-  await roundCloudService.saveActiveRound(mergedData);
-  return mergedData;
+  const saveResult = await roundCloudService.saveActiveRound(mergedData);
+  const savedData = saveResult.ok && saveResult.round ? saveResult.round : mergedData;
+
+  if (saveResult.ok) {
+    latestCloudActiveRoundInfo = {
+      id: savedData.id,
+      cloudUpdatedAt: saveResult.cloudUpdatedAt || savedData.cloudUpdatedAt || ""
+    };
+    roundStorage.saveUnfinished(savedData);
+    renderActiveRoundDiagnostics({ loadedFrom: "saved to cloud" });
+  }
+
+  return savedData;
 }
 
 function saveCompletedRound() {
@@ -1719,6 +1790,44 @@ function showFinalSummary() {
     ? "Final scores recorded."
     : "Round complete. Review scores, then tap Confirm Final Scores.";
   scrollToTop();
+}
+
+function transitionToCompletedRound(completedRound, source = "cloud completed round") {
+  if (!completedRound) return false;
+
+  roundStorage.clearUnfinished();
+  roundStorage.save(completedRound);
+  loadSavedRoundIntoState(completedRound);
+  completedRoundSaved = true;
+  showFinalSummary();
+  elements.cloudSaveStatus.textContent =
+    `Round Complete. Final results loaded from ${source}.`;
+  renderActiveRoundDiagnostics({ loadedFrom: source });
+  return true;
+}
+
+async function checkCompletedRoundFromCloud({ silent = false } = {}) {
+  if (!roundState || completedRoundSaved || finalRoundSyncInFlight) return false;
+
+  finalRoundSyncInFlight = true;
+  const currentRoundId = roundState.id;
+
+  try {
+    const completedResult = await roundCloudService.loadCompletedRoundById(currentRoundId);
+
+    if (completedResult.ok && completedResult.round) {
+      return transitionToCompletedRound(completedResult.round, "completed cloud round");
+    }
+
+    if (!silent && elements.liveRefreshStatus) {
+      elements.liveRefreshStatus.textContent =
+        completedResult.message || "Round is not complete in cloud yet.";
+    }
+
+    return false;
+  } finally {
+    finalRoundSyncInFlight = false;
+  }
 }
 
 async function completeFullRoundIfReady(context = "completion-check") {
@@ -1785,7 +1894,7 @@ function startNewRound() {
 async function clearRoundCacheForReset() {
   roundStorage.clearUnfinished();
   clearScorerForCurrentRound();
-  return roundCloudService.clearActiveRound();
+  return { ok: true };
 }
 
 function discardSavedRound() {
@@ -2215,7 +2324,11 @@ async function beginGroupedRound() {
 
   setActiveScreen("round");
   renderApp();
-  await autoSaveUnfinishedRound();
+  const publishedRound = await autoSaveUnfinishedRound();
+  elements.liveRefreshStatus.textContent = publishedRound?.cloudUpdatedAt
+    ? "Active match published to cloud."
+    : "Active match is open on this device. Cloud publish did not confirm.";
+  renderActiveRoundDiagnostics({ loadedFrom: publishedRound?.cloudUpdatedAt ? "new round published" : "new round local" });
   scrollToScoring();
 }
 
@@ -2286,34 +2399,69 @@ async function loadActiveRoundFromCloudFirst() {
   const cloudResult = await roundCloudService.loadActiveRound();
 
   if (!cloudResult.ok || !cloudResult.round) {
+    latestCloudActiveRoundInfo = {
+      id: "",
+      cloudUpdatedAt: "",
+      details: cloudResult.ok
+        ? `Cloud rows found: ${cloudResult.rowsFound || 0}, readable: ${cloudResult.readableRows || 0}`
+        : `Cloud lookup failed: ${cloudResult.message || "unknown error"}`
+    };
+    renderActiveRoundDiagnostics({ loadedFrom: "no cloud active round" });
     return { ok: false, round: null };
   }
 
+  latestCloudActiveRoundInfo = {
+    id: cloudResult.round.id || cloudResult.record?.id || "",
+    cloudUpdatedAt: cloudResult.cloudUpdatedAt || cloudResult.round.cloudUpdatedAt || cloudResult.record?.played_at || "",
+    details: `Cloud rows found: ${cloudResult.rowsFound || 0}, readable: ${cloudResult.readableRows || 0}`
+  };
   loadSavedRoundIntoState(cloudResult.round);
   const scoreResult = await applyCloudScoreStateForActiveRound(roundState.id);
 
   if (!scoreResult.ok) {
-    return scoreResult;
+    roundStorage.saveUnfinished(roundState.getAutoSaveExport());
+    renderActiveRoundDiagnostics({ loadedFrom: "cloud active round, score refresh pending" });
+    return {
+      ok: true,
+      round: cloudResult.round,
+      scoreRefreshOk: false,
+      message: scoreResult.message || "Loaded active match setup. Live scores did not refresh yet."
+    };
   }
 
   roundStorage.saveUnfinished(roundState.getAutoSaveExport());
-  return { ok: true, round: cloudResult.round };
+  renderActiveRoundDiagnostics({ loadedFrom: "cloud active round" });
+  return { ok: true, round: cloudResult.round, scoreRefreshOk: true };
 }
 
 async function refreshLiveScores({ keepLeaderboard = false } = {}) {
-  if (!roundState) {
-    elements.liveRefreshStatus.textContent = "No active round to refresh.";
-    return false;
-  }
-
   const wasLeaderboard = keepLeaderboard || elements.roundScreen.classList.contains("is-leaderboard-view");
-  elements.liveRefreshStatus.textContent = "Refreshing live scores...";
+  const previousRoundId = roundState?.id || "";
+  elements.liveRefreshStatus.textContent = "Checking cloud for the active round...";
 
-  const result = await applyCloudScoreStateForActiveRound(roundState.id);
+  const activeResult = await loadActiveRoundFromCloudFirst();
 
-  if (!result.ok) {
-    elements.liveRefreshStatus.textContent = result.message || "Cloud refresh failed. Showing saved device copy.";
-    return false;
+  if (!activeResult.ok) {
+    if (!roundState) {
+      elements.liveRefreshStatus.textContent = "No active cloud round found.";
+      renderActiveRoundDiagnostics({ loadedFrom: "refresh failed" });
+      return false;
+    }
+
+    const completedTransitioned = await checkCompletedRoundFromCloud();
+
+    if (completedTransitioned) {
+      return true;
+    }
+
+    elements.liveRefreshStatus.textContent = "Cloud active round lookup failed. Refreshing this device's loaded round...";
+    const fallbackResult = await applyCloudScoreStateForActiveRound(roundState.id);
+
+    if (!fallbackResult.ok) {
+      elements.liveRefreshStatus.textContent = fallbackResult.message || "Cloud refresh failed. Showing saved device copy.";
+      renderActiveRoundDiagnostics({ loadedFrom: "local fallback" });
+      return false;
+    }
   }
 
   renderApp();
@@ -2324,8 +2472,13 @@ async function refreshLiveScores({ keepLeaderboard = false } = {}) {
     showScoreMyGroup();
   }
 
-  elements.liveRefreshStatus.textContent =
-    `Live scores updated from cloud (${result.scores.length} saved scores).`;
+  const roundChangedText = previousRoundId && previousRoundId !== roundState.id
+    ? ` Loaded new active round ${roundState.id}.`
+    : "";
+  elements.liveRefreshStatus.textContent = activeResult.scoreRefreshOk === false
+    ? `Loaded active match from cloud. Scores did not refresh yet.${roundChangedText}`
+    : `Live match updated from cloud.${roundChangedText}`;
+  renderActiveRoundDiagnostics({ loadedFrom: "live refresh" });
   return true;
 }
 
@@ -2390,6 +2543,11 @@ async function initializeApp() {
 }
 
 initializeApp();
+
+window.setInterval(() => {
+  if (!roundState || completedRoundSaved) return;
+  checkCompletedRoundFromCloud({ silent: true });
+}, 30000);
 
 elements.menuToggle.addEventListener("click", toggleMenu);
 elements.toggleCommissionerMode.addEventListener("click", () => {
@@ -2677,11 +2835,24 @@ elements.resetScores.addEventListener("click", async () => {
   }
 
   const resetResult = await clearRoundCacheForReset();
-  startFreshRound();
   elements.modeStatus.textContent = resetResult.ok
-    ? "Commissioner View: reset complete. In-progress round cache cleared."
-    : "Commissioner View: local cache cleared. Cloud active round could not be cleared.";
-  scrollToTop();
+    ? "Commissioner View: this device's saved round cache was cleared. Reloading active cloud round..."
+    : "Commissioner View: local cache clear failed.";
+
+  const activeResult = await loadActiveRoundFromCloudFirst();
+
+  if (activeResult.ok) {
+    setActiveScreen("round");
+    renderApp();
+    showScoreMyGroup();
+    elements.liveRefreshStatus.textContent = "Loaded current active round from cloud after local reset.";
+    renderActiveRoundDiagnostics({ loadedFrom: "reset then cloud reload" });
+    scrollToScoring();
+    return;
+  }
+
+  startFreshRound();
+  elements.modeStatus.textContent = "Commissioner View: local cache cleared. No active cloud round was found.";
 });
 
 elements.reviewScorecard.addEventListener("click", reviewScorecard);

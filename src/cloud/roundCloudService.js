@@ -1,6 +1,67 @@
 window.OGSGolf = window.OGSGolf || {};
 window.OGSGolf.cloud = window.OGSGolf.cloud || {};
 
+function getRoundCloudUpdatedAt(roundData, row = {}) {
+  return row.updated_at
+    || roundData?.cloudUpdatedAt
+    || roundData?.roundSettings?.cloudUpdatedAt
+    || roundData?.roundSettings?.startedAt
+    || roundData?.startedAt
+    || row.played_at
+    || roundData?.date
+    || "";
+}
+
+function getRoundSortTime(roundData, row = {}) {
+  const timeText = getRoundCloudUpdatedAt(roundData, row);
+  const parsedTime = Date.parse(timeText);
+
+  if (Number.isFinite(parsedTime)) return parsedTime;
+
+  const idText = String(row.id || roundData?.id || "");
+  const timestampMatch = idText.match(/(\d{10,})/);
+  return timestampMatch ? Number(timestampMatch[1]) : 0;
+}
+
+function normalizeRawRound(rawData) {
+  if (!rawData) return null;
+  if (typeof rawData !== "string") return rawData;
+
+  try {
+    return JSON.parse(rawData);
+  } catch (error) {
+    console.warn("[OGS Golf] Skipping active round row with unreadable raw_data.", error);
+    return null;
+  }
+}
+
+async function upsertRestRows({ table, rows, onConflict, config }) {
+  const rowList = Array.isArray(rows) ? rows : [rows];
+
+  if (rowList.length === 0) {
+    return { ok: true };
+  }
+
+  const query = onConflict ? `?on_conflict=${encodeURIComponent(onConflict)}` : "";
+  const response = await fetch(`${config.url}/rest/v1/${table}${query}`, {
+    method: "POST",
+    headers: {
+      apikey: config.anonKey,
+      Authorization: `Bearer ${config.anonKey}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=representation"
+    },
+    body: JSON.stringify(Array.isArray(rows) ? rows : rows)
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`${table} upsert failed. ${details || ""}`.trim());
+  }
+
+  return { ok: true, rows: await response.json() };
+}
+
 window.OGSGolf.cloud.roundCloudService = {
   async loadActiveRound() {
     const config = window.OGSGolf.cloud.supabaseConfig;
@@ -11,7 +72,7 @@ window.OGSGolf.cloud.roundCloudService = {
 
     try {
       const response = await fetch(
-        `${config.url}/rest/v1/rounds?select=raw_data&completed=eq.false&order=played_at.desc&limit=1`,
+        `${config.url}/rest/v1/rounds?select=id,played_at,raw_data&completed=eq.false&order=played_at.desc&limit=25`,
         {
           headers: {
             apikey: config.anonKey,
@@ -20,44 +81,129 @@ window.OGSGolf.cloud.roundCloudService = {
         }
       );
 
-      if (!response.ok) throw new Error("Active event request failed.");
+      if (!response.ok) {
+        const details = await response.text();
+        throw new Error(details || "Active event request failed.");
+      }
 
       const data = await response.json();
-      const rawData = data[0]?.raw_data;
+      const activeRows = (data || [])
+        .map((row) => ({
+          row,
+          round: normalizeRawRound(row.raw_data)
+        }))
+        .filter((item) => item.round)
+        .sort((a, b) => getRoundSortTime(b.round, b.row) - getRoundSortTime(a.round, a.row));
+      const activeRound = activeRows[0] || null;
 
       return {
         ok: true,
-        round: typeof rawData === "string" ? JSON.parse(rawData) : rawData || null
+        round: activeRound?.round || null,
+        record: activeRound?.row || null,
+        cloudUpdatedAt: activeRound ? getRoundCloudUpdatedAt(activeRound.round, activeRound.row) : "",
+        rowsFound: data.length,
+        readableRows: activeRows.length
       };
     } catch (error) {
-      return { ok: false, round: null };
+      return { ok: false, round: null, message: error.message || "Active round lookup failed." };
     }
   },
 
   async saveActiveRound(roundData) {
-    const client = window.OGSGolf.cloud.getSupabaseClient();
+    const config = window.OGSGolf.cloud.supabaseConfig;
 
-    if (!client) {
-      return { ok: false };
+    if (!config.url || !config.anonKey) {
+      return { ok: false, reason: "not-configured", message: "Supabase is not configured." };
     }
 
     try {
-      await client.from("courses").upsert({
-        id: roundData.course.id,
-        name: roundData.course.name,
-        par: roundData.course.par
-      }).throwOnError();
-      await client.from("rounds").upsert({
-        id: roundData.id,
-        played_at: roundData.date || new Date().toISOString(),
-        course_id: roundData.course.id,
-        completed: false,
-        raw_data: roundData
-      }).throwOnError();
+      const cloudUpdatedAt = new Date().toISOString();
+      const activeRoundData = {
+        ...roundData,
+        cloudUpdatedAt,
+        roundSettings: {
+          ...(roundData.roundSettings || {}),
+          cloudUpdatedAt
+        }
+      };
+      const groupRecords = activeRoundData.roundSettings?.groupRecords || [];
+      const groups = activeRoundData.roundSettings?.groups || [];
+      const groupRows = groupRecords.map((group, index) => ({
+        id: group.cloudId || `${activeRoundData.id}-group-${index + 1}`,
+        round_id: activeRoundData.id,
+        group_number: index + 1,
+        starting_hole: Number(group.startingHole || group.starting_hole || 1),
+        holes_to_play: Number(group.holesToPlay || group.holes_to_play || 18),
+        status: group.status || "in_progress",
+        completed_at: group.completedAt || group.completed_at || null
+      }));
+      const groupIdByPlayerId = new Map();
 
-      return { ok: true };
+      groups.forEach((playerIds, groupIndex) => {
+        playerIds.forEach((playerId) => {
+          groupIdByPlayerId.set(playerId, groupRows[groupIndex]?.id || `${activeRoundData.id}-group-${groupIndex + 1}`);
+        });
+      });
+
+      const roundPlayerRows = (activeRoundData.players || []).map((player) => ({
+        id: `${activeRoundData.id}:${player.id}`,
+        round_id: activeRoundData.id,
+        player_id: player.id,
+        tee: player.tee || "white",
+        handicap_index: Number(player.handicapIndex ?? player.handicap ?? 0),
+        course_handicap: Number(player.courseHandicap ?? 0),
+        group_id: groupIdByPlayerId.get(player.id) || null,
+        playing: player.playing !== false,
+        skins_enabled: player.inSkins === true,
+        points_enabled: player.inPoints === true
+      }));
+
+      await upsertRestRows({
+        table: "courses",
+        onConflict: "id",
+        config,
+        rows: {
+        id: activeRoundData.course.id,
+        name: activeRoundData.course.name,
+        par: activeRoundData.course.par
+        }
+      });
+      await upsertRestRows({
+        table: "rounds",
+        onConflict: "id",
+        config,
+        rows: {
+        id: activeRoundData.id,
+        played_at: activeRoundData.roundSettings?.startedAt || activeRoundData.date || cloudUpdatedAt,
+        course_id: activeRoundData.course.id,
+        completed: false,
+        raw_data: activeRoundData
+        }
+      });
+
+      let detailSyncOk = true;
+
+      try {
+        await upsertRestRows({
+          table: "round_groups",
+          rows: groupRows,
+          onConflict: "round_id,group_number",
+          config
+        });
+        await upsertRestRows({
+          table: "round_players",
+          rows: roundPlayerRows,
+          onConflict: "round_id,player_id",
+          config
+        });
+      } catch (detailError) {
+        detailSyncOk = false;
+        console.warn("[OGS Golf] Active round detail rows did not sync, but main active round was saved.", detailError);
+      }
+
+      return { ok: true, round: activeRoundData, cloudUpdatedAt, detailSyncOk };
     } catch (error) {
-      return { ok: false };
+      return { ok: false, reason: "failed", message: `Active round cloud save failed. ${error.message || ""}`.trim() };
     }
   },
 
@@ -162,6 +308,53 @@ window.OGSGolf.cloud.roundCloudService = {
     }
   },
 
+  async loadCompletedRoundById(roundId) {
+    const config = window.OGSGolf.cloud.supabaseConfig;
+
+    if (!config.url || !config.anonKey || !roundId) {
+      return {
+        ok: false,
+        reason: "not-configured",
+        round: null,
+        message: "Cloud completed-round lookup is not available."
+      };
+    }
+
+    try {
+      const response = await fetch(
+        `${config.url}/rest/v1/rounds?select=id,played_at,raw_data&completed=eq.true&id=eq.${encodeURIComponent(roundId)}&limit=1`,
+        {
+          headers: {
+            apikey: config.anonKey,
+            Authorization: `Bearer ${config.anonKey}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        const details = await response.text();
+        throw new Error(details || "Completed round lookup failed.");
+      }
+
+      const rows = await response.json();
+      const rawData = rows[0]?.raw_data;
+      const round = normalizeRawRound(rawData);
+
+      return {
+        ok: true,
+        round,
+        record: rows[0] || null
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: "failed",
+        round: null,
+        message: error.message || "Completed round lookup failed."
+      };
+    }
+  },
+
   async saveCompletedRound(roundData) {
     const client = window.OGSGolf.cloud.getSupabaseClient();
 
@@ -178,12 +371,24 @@ window.OGSGolf.cloud.roundCloudService = {
       name: roundData.course.name,
       par: roundData.course.par
     };
-    const round = {
-      id: roundData.id,
-      played_at: roundData.date,
-      course_id: roundData.course.id,
+    const completedAt = roundData.completedAt || roundData.savedAt || new Date().toISOString();
+    const completedRoundData = {
+      ...roundData,
       completed: true,
-      raw_data: roundData
+      status: "complete",
+      completedAt,
+      roundSettings: {
+        ...(roundData.roundSettings || {}),
+        eventStatus: "Complete",
+        completedAt
+      }
+    };
+    const round = {
+      id: completedRoundData.id,
+      played_at: completedRoundData.date,
+      course_id: completedRoundData.course.id,
+      completed: true,
+      raw_data: completedRoundData
     };
     const roundPlayers = roundData.players.map((player) => ({
       round_id: roundData.id,
@@ -399,7 +604,7 @@ window.OGSGolf.cloud.roundCloudService.fetchCurrentActiveRoundRecord = async fun
 
   try {
     const response = await fetch(
-      `${config.url}/rest/v1/rounds?select=*&completed=eq.false&order=played_at.desc&limit=1`,
+      `${config.url}/rest/v1/rounds?select=*&completed=eq.false&order=played_at.desc&limit=25`,
       {
         headers: {
           apikey: config.anonKey,
@@ -411,9 +616,17 @@ window.OGSGolf.cloud.roundCloudService.fetchCurrentActiveRoundRecord = async fun
     if (!response.ok) throw new Error("Active round fetch failed.");
 
     const rows = await response.json();
+    const activeRows = (rows || [])
+      .map((row) => ({
+        ...row,
+        raw_data: normalizeRawRound(row.raw_data)
+      }))
+      .filter((row) => row.raw_data)
+      .sort((a, b) => getRoundSortTime(b.raw_data, b) - getRoundSortTime(a.raw_data, a));
+
     return {
       ok: true,
-      round: rows[0] || null
+      round: activeRows[0] || null
     };
   } catch (error) {
     return { ok: false, reason: "failed", round: null, message: "Active round fetch failed." };

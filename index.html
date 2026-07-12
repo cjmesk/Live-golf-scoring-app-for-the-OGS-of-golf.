@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OG&apos;s Golf</title>
-      <link rel="stylesheet" href="src/styles/main.css?v=20260712-hole-result-confirmation">
+      <link rel="stylesheet" href="src/styles/main.css?v=20260712-compact-mobile-scoring">
 </head>
 <body>
   <header class="app-header">
@@ -44,6 +44,7 @@
     </div>
     <div id="modeStatus" class="cloud-save-status"></div>
     <div id="rosterCloudStatus" class="cloud-save-status is-hidden"></div>
+    <div id="activeRoundDiagnostics" class="cloud-save-status live-refresh-status"></div>
 
     <section id="todayScreen" class="today-section is-hidden" aria-labelledby="todayTitle">
       <div class="setup-header today-header">
@@ -326,7 +327,7 @@
 
       <div class="summary-actions">
         <button id="viewFinalLeaderboard" type="button" class="secondary-button">View Final Leaderboard</button>
-        <button id="reviewScorecard" type="button" class="secondary-button">View Full Scorecard</button>
+        <button id="reviewScorecard" type="button" class="secondary-button">View Full Scorecard / All Groups</button>
         <button id="summaryPreviousRounds" type="button" class="secondary-button">Previous Rounds</button>
         <button id="summaryReturnHome" type="button" class="secondary-button">Return to Home</button>
         <button id="summaryUndoLastHole" type="button" class="secondary-button">Undo Last Hole</button>
@@ -514,8 +515,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="src/cloud/supabaseConfig.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/supabaseClient.js?v=20260709-v098-menu"></script>
-  <script src="src/cloud/roundCloudService.js?v=20260712-phase2b-cloud-first"></script>
-  <script src="src/ui/dom.js?v=20260712-hole-result-confirmation"></script>
+  <script src="src/cloud/roundCloudService.js?v=20260712-final-round-sync"></script>
+  <script src="src/ui/dom.js?v=20260712-active-round-selection"></script>
   <script src="src/ui/formatters.js?v=20260710-index-course-handicap"></script>
   <script src="src/ui/setupView.js?v=20260712-phase2b-cloud-first"></script>
   <script src="src/ui/holeView.js?v=20260712-direct-score-gross-fix"></script>
@@ -527,6 +528,6 @@
   <script src="src/ui/playerManagementView.js?v=20260711-cloud-roster-save"></script>
   <script src="src/ui/groupSetupView.js?v=20260710-flex-hole-order"></script>
   <script src="src/ui/eventSummaryView.js?v=20260710-round-setup"></script>
-  <script src="src/app.js?v=20260712-clear-group-save-recap"></script>
+  <script src="src/app.js?v=20260712-final-round-sync"></script>
 </body>
 </html>
