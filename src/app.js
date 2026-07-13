@@ -1894,6 +1894,17 @@ function startNewRound() {
 async function clearRoundCacheForReset() {
   roundStorage.clearUnfinished();
   clearScorerForCurrentRound();
+  roundSettings = null;
+  pendingRoundSettings = null;
+  roundState = null;
+  selectedPlayers = [];
+  currentGroupIndex = 0;
+  groupHoleIndexes = [];
+  completedRoundSaved = false;
+  viewOnlyMode = false;
+  scoreOverrideOpen = false;
+  scoreOverrideActive = false;
+  clearSaveConfirmation();
   return { ok: true };
 }
 
@@ -2835,24 +2846,13 @@ elements.resetScores.addEventListener("click", async () => {
   }
 
   const resetResult = await clearRoundCacheForReset();
+  renderSetupView(elements, courses, members);
+  setActiveScreen("setup");
   elements.modeStatus.textContent = resetResult.ok
-    ? "Commissioner View: this device's saved round cache was cleared. Reloading active cloud round..."
-    : "Commissioner View: local cache clear failed.";
-
-  const activeResult = await loadActiveRoundFromCloudFirst();
-
-  if (activeResult.ok) {
-    setActiveScreen("round");
-    renderApp();
-    showScoreMyGroup();
-    elements.liveRefreshStatus.textContent = "Loaded current active round from cloud after local reset.";
-    renderActiveRoundDiagnostics({ loadedFrom: "reset then cloud reload" });
-    scrollToScoring();
-    return;
-  }
-
-  startFreshRound();
-  elements.modeStatus.textContent = "Commissioner View: local cache cleared. No active cloud round was found.";
+    ? "Commissioner View: this device was reset. Shared cloud rounds were not deleted."
+    : "Commissioner View: reset failed.";
+  renderActiveRoundDiagnostics({ loadedFrom: "device reset" });
+  scrollToTop();
 });
 
 elements.reviewScorecard.addEventListener("click", reviewScorecard);
