@@ -60,6 +60,31 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
     })
     .join("");
 
+  const pointsRows = summary.pointsResultStandings
+    .map((item) => `
+      <div class="summary-row points-result-row">
+        <span>${item.rankLabel}. ${item.player.name}</span>
+        <strong>${item.overall.display} Overall</strong>
+        <small>Front: ${item.totals.frontPoints} points, ${item.front.display}</small>
+        <small>Back: ${item.totals.backPoints} points, ${item.back.display}</small>
+        <small>Total: ${item.totals.points} points</small>
+      </div>
+    `)
+    .join("");
+  const pointsResultsSection = summary.pointsResultStandings.length
+    ? `
+      <section class="summary-block">
+        <h3>Points Results</h3>
+        <div class="summary-grid">
+          ${formatPointsWinner(summary.points.front, "Front-nine Points Winner")}
+          ${formatPointsWinner(summary.points.back, "Back-nine Points Winner")}
+          ${formatPointsWinner(summary.points.overall, "Overall Points Winner")}
+        </div>
+        <div class="summary-list">${pointsRows}</div>
+      </section>
+    `
+    : "";
+
   const totalRows = summary.playerTotals
     .map((item) => {
       const dnfText = item.dnf ? `DNF - ${item.dnf.holesCompleted} holes - ${item.dnf.grossStrokes} strokes` : "";
@@ -72,7 +97,7 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
           <span>${item.player.name}</span>
           <strong>${item.dnf ? "DNF" : overallGrossText}</strong>
           <small>${frontGrossText} | ${backGrossText}</small>
-          <small>${item.dnf ? dnfText : `${roundState.isInPoints(item.player) ? `Points ${roundState.getPointsDifferential(item.player, "overall").display} (${item.totals.points}/${item.totals.overallPointsTarget})` : "Not in Points"} | Net ${item.totals.net}`}</small>
+          <small>${item.dnf ? dnfText : `Net ${item.totals.net}`}</small>
         </div>
       `;
     })
@@ -82,13 +107,12 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
     <div class="summary-grid">
       ${formatWinner(summary.grossWinner, "Gross Winner")}
       ${formatWinner(summary.netWinner, "Net Winner")}
-      ${formatPointsWinner(summary.points.front, "Front 9 Points Winner")}
-      ${formatPointsWinner(summary.points.back, "Back 9 Points Winner")}
-      ${formatPointsWinner(summary.points.overall, "Overall Points Winner")}
     </div>
 
+    ${pointsResultsSection}
+
     <section class="summary-block">
-      <h3>Total Points, Gross, and Net</h3>
+      <h3>Gross Results</h3>
       <div class="summary-list">${totalRows}</div>
     </section>
 

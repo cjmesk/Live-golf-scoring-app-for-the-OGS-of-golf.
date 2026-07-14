@@ -29,7 +29,10 @@ window.OGSGolf.state.createRoundState = function createRoundState(
 
   players.forEach((player) => {
     savedScores[player.id] = savedRound?.savedScores?.[player.id] || Array(totalHoles).fill(null);
-    courseHandicaps[player.id] = getCourseHandicap(player, course);
+    const savedCourseHandicap = Number(player.courseHandicap);
+    courseHandicaps[player.id] = Number.isFinite(savedCourseHandicap)
+      ? savedCourseHandicap
+      : getCourseHandicap(player, course);
   });
 
   function isInSkins(player) {
@@ -292,6 +295,54 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     };
   }
 
+  function getPointsResultStandings() {
+    let currentRank = 1;
+    const standings = getPointsPlayers()
+      .map((player) => {
+        const totals = getPlayerTotals(player);
+
+        return {
+          player,
+          totals,
+          front: getPointsDifferential(player, "front"),
+          back: getPointsDifferential(player, "back"),
+          overall: getPointsDifferential(player, "overall")
+        };
+      })
+      .sort((a, b) => {
+        if (b.overall.differential !== a.overall.differential) {
+          return b.overall.differential - a.overall.differential;
+        }
+
+        if (b.totals.points !== a.totals.points) {
+          return b.totals.points - a.totals.points;
+        }
+
+        return a.player.name.localeCompare(b.player.name);
+      });
+
+    return standings.map((standing, index) => {
+      const previousStanding = standings[index - 1];
+      const nextStanding = standings[index + 1];
+      const tiedWithPrevious = previousStanding
+        && previousStanding.overall.differential === standing.overall.differential
+        && previousStanding.totals.points === standing.totals.points;
+      const tiedWithNext = nextStanding
+        && nextStanding.overall.differential === standing.overall.differential
+        && nextStanding.totals.points === standing.totals.points;
+
+      if (!tiedWithPrevious) {
+        currentRank = index + 1;
+      }
+
+      return {
+        ...standing,
+        rank: currentRank,
+        rankLabel: tiedWithPrevious || tiedWithNext ? `T${currentRank}` : String(currentRank)
+      };
+    });
+  }
+
   function getLeaderboardStandings() {
     return players
       .map((player) => ({
@@ -455,6 +506,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       grossWinner: getLowestScoreLeaders("gross"),
       netWinner: getLowestScoreLeaders("net"),
       points: getPointsSummary(),
+      pointsResultStandings: getPointsResultStandings(),
       skins: getSkinSummary(),
       playerTotals: players.map((player) => ({
         player,
@@ -673,6 +725,27 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         backPoints: finalSummary.points.back,
         overallPoints: finalSummary.points.overall,
         netSkins: getSkinSummary()
+      },
+      pointsResults: {
+        winners: finalSummary.points,
+        standings: finalSummary.pointsResultStandings.map((standing) => ({
+          rank: standing.rank,
+          rankLabel: standing.rankLabel,
+          playerId: standing.player.id,
+          playerName: standing.player.name,
+          frontPoints: standing.totals.frontPoints,
+          frontResult: standing.front.display,
+          frontDifferential: standing.front.differential,
+          frontQuota: standing.front.target,
+          backPoints: standing.totals.backPoints,
+          backResult: standing.back.display,
+          backDifferential: standing.back.differential,
+          backQuota: standing.back.target,
+          totalPoints: standing.totals.points,
+          overallResult: standing.overall.display,
+          overallDifferential: standing.overall.differential,
+          overallQuota: standing.overall.target
+        }))
       },
       finalSummary
     };
@@ -947,6 +1020,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     getPointsQuota,
     getPointsDifferential,
     getPointsSummary,
+    getPointsResultStandings,
     getLeaderboardStandings,
     getStrokesForPlayerOnHole,
     getSkinSummary,

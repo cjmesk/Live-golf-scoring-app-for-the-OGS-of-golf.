@@ -115,9 +115,9 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
       </div>
       <div class="leaderboard-totals">
         <span class="points">${overallPointsResult.display}</span>
-        <span class="gross">Total ${totals.points} pts</span>
-        <span class="gross">Front ${totals.frontPoints} pts / ${frontPointsResult.display}</span>
-        <span class="gross">Back ${totals.backPoints} pts / ${backPointsResult.display}</span>
+        <span class="gross">${totals.points} points</span>
+        <span class="gross">Front ${frontPointsResult.display}</span>
+        <span class="gross">Back ${backPointsResult.display}</span>
       </div>
     `;
     section.appendChild(row);
@@ -175,16 +175,11 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
 
   elements.leaderboard.innerHTML = "";
 
+  if (pointsStandings.length > 0) {
+    const pointsSection = makeSection("Points Leaderboard");
+    pointsStandings.forEach((standing) => renderPointsRow(pointsSection, standing));
+  }
+
   const grossSection = makeSection("Gross Leaderboard");
   grossStandings.forEach((standing) => renderGrossRow(grossSection, standing));
-
-  if (pointsEnabled) {
-    const pointsSection = makeSection("Chicago Points Leaderboard");
-
-    if (pointsStandings.length === 0) {
-      pointsSection.insertAdjacentHTML("beforeend", `<div class="empty-state">No players entered in the Points Game.</div>`);
-    } else {
-      pointsStandings.forEach((standing) => renderPointsRow(pointsSection, standing));
-    }
-  }
 };

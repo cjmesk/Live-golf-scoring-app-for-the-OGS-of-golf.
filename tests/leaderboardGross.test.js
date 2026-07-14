@@ -11,7 +11,8 @@ global.OGSGolf = {};
   "src/rules/skins.js",
   "src/state/roundState.js",
   "src/ui/holeView.js",
-  "src/ui/leaderboardView.js"
+  "src/ui/leaderboardView.js",
+  "src/ui/finalSummaryView.js"
 ].forEach((filePath) => {
   const source = fs.readFileSync(path.join(__dirname, "..", filePath), "utf8");
   vm.runInThisContext(source, { filename: filePath });
@@ -342,12 +343,16 @@ if (!splitLeaderboardElement.innerHTML.includes("Gross Leaderboard")) {
   throw new Error("Leaderboard did not render a separate Gross Leaderboard section.");
 }
 
-if (!splitLeaderboardElement.innerHTML.includes("Chicago Points Leaderboard")) {
-  throw new Error("Leaderboard did not render a separate Chicago Points section.");
+if (!splitLeaderboardElement.innerHTML.includes("Points Leaderboard")) {
+  throw new Error("Leaderboard did not render a separate Points Leaderboard section.");
 }
 
 const grossSection = splitLeaderboardElement.sections.find((section) => section.innerHTML.includes("Gross Leaderboard"));
-const pointsSection = splitLeaderboardElement.sections.find((section) => section.innerHTML.includes("Chicago Points Leaderboard"));
+const pointsSection = splitLeaderboardElement.sections.find((section) => section.innerHTML.includes("Points Leaderboard"));
+
+if (splitLeaderboardElement.sections.indexOf(pointsSection) > splitLeaderboardElement.sections.indexOf(grossSection)) {
+  throw new Error("Points leaderboard must appear above Gross leaderboard when points players exist.");
+}
 
 if (!grossSection.innerHTML.includes("Gross Only") || !grossSection.innerHTML.includes("Points Player") || !grossSection.innerHTML.includes("Tie Player")) {
   throw new Error("Gross leaderboard must include every player.");
@@ -370,3 +375,68 @@ if (!pointsSection.innerHTML.includes("<div class=\"rank\">T1</div>")) {
 }
 
 console.log("Split gross and Chicago leaderboard test passed.");
+
+const finalSummaryRoundState = window.OGSGolf.state.createRoundState(course, splitLeaderboardPlayers, {
+  course,
+  players: splitLeaderboardPlayers,
+  groups: [["gross-only", "points-player", "tie-player"]],
+  groupRecords: [{ holesToPlay: 18 }],
+  games: {
+    pointsGame: { enabled: true },
+    netSkins: { enabled: false }
+  },
+  playerStatuses: {}
+});
+
+finalSummaryRoundState.applyCloudHoleScores([
+  ...pars.map((par, index) => ({
+    player_id: "gross-only",
+    hole: index + 1,
+    gross: par,
+    strokes_received: 0,
+    net: par
+  })),
+  ...pars.map((par, index) => ({
+    player_id: "points-player",
+    hole: index + 1,
+    gross: par - 1,
+    strokes_received: 0,
+    net: par - 1
+  })),
+  ...pars.map((par, index) => ({
+    player_id: "tie-player",
+    hole: index + 1,
+    gross: par,
+    strokes_received: 0,
+    net: par
+  }))
+]);
+
+const finalSummaryElement = { innerHTML: "" };
+window.OGSGolf.ui.renderFinalSummary({ finalSummary: finalSummaryElement }, finalSummaryRoundState);
+
+if (finalSummaryElement.innerHTML.indexOf("Points Results") > finalSummaryElement.innerHTML.indexOf("Gross Results")) {
+  throw new Error("Round Complete page must show Points Results above Gross Results.");
+}
+
+if (finalSummaryElement.innerHTML.includes("Gross Only</span>\n        <strong>") && finalSummaryElement.innerHTML.indexOf("Gross Only") < finalSummaryElement.innerHTML.indexOf("Gross Results")) {
+  throw new Error("Points Results must not include players who are not in the points game.");
+}
+
+if (!finalSummaryElement.innerHTML.includes("Front-nine Points Winner")
+  || !finalSummaryElement.innerHTML.includes("Back-nine Points Winner")
+  || !finalSummaryElement.innerHTML.includes("Overall Points Winner")) {
+  throw new Error("Round Complete page must show front, back, and overall points winner labels.");
+}
+
+if (!finalSummaryElement.innerHTML.includes("1. Points Player")) {
+  throw new Error("Points Results must rank the best quota result first.");
+}
+
+const exportedRound = finalSummaryRoundState.getRoundExport();
+
+if (!exportedRound.pointsResults?.standings?.length) {
+  throw new Error("Completed round export must preserve points result standings.");
+}
+
+console.log("Final points results test passed.");

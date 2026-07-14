@@ -1103,6 +1103,11 @@ body.is-scoring .current-hole-status {
   grid-column: 1 / -1;
 }
 
+.points-result-row strong {
+  color: var(--green-dark);
+  font-size: 1.18rem;
+}
+
 .summary-actions {
   margin-top: 12px;
 }
