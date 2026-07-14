@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OG&apos;s Golf</title>
-      <link rel="stylesheet" href="src/styles/main.css?v=20260712-compact-mobile-scoring">
+      <link rel="stylesheet" href="src/styles/main.css?v=20260714-commissioner-navigation">
 </head>
 <body>
   <header class="app-header">
@@ -216,6 +216,21 @@
         <button id="changeScorerQuick" type="button" class="secondary-button">Not you? Change scorer</button>
         <div id="liveRefreshStatus" class="cloud-save-status live-refresh-status"></div>
       </nav>
+
+      <section id="commissionerGroupSelection" class="commissioner-group-selection is-hidden" aria-labelledby="commissionerGroupSelectionTitle">
+        <div class="setup-header">
+          <div>
+            <p class="eyebrow dark">Commissioner View</p>
+            <h2 id="commissionerGroupSelectionTitle">Choose a Group</h2>
+          </div>
+        </div>
+        <p class="player-details">Open scoring for any active group or review a group that has already finished.</p>
+        <div id="commissionerGroupSelectionList" class="score-override-list"></div>
+        <div class="completed-group-actions">
+          <button id="commissionerGroupSelectionLeaderboard" type="button" class="secondary-button">View Leaderboard</button>
+          <button id="commissionerGroupSelectionDashboard" type="button" class="secondary-button">Commissioner Dashboard</button>
+        </div>
+      </section>
 
       <section class="hole-section" aria-labelledby="holeTitle">
       <div class="round-status-bar">
@@ -505,22 +520,22 @@
 
   <script src="src/data/course.js?v=20260710-tee-handicap"></script>
   <script src="src/data/players.js?v=20260709-v098-menu"></script>
-  <script src="src/rules/points.js?v=20260712-hole-result-confirmation"></script>
+  <script src="src/rules/points.js?v=20260714-chicago-points"></script>
   <script src="src/rules/handicap.js?v=20260710-handicap-verify"></script>
   <script src="src/rules/skins.js?v=20260709-v098-menu"></script>
   <script src="src/state/playerStorage.js?v=20260709-v098-menu"></script>
   <script src="src/state/scorerStorage.js?v=20260711-device-scorer"></script>
-  <script src="src/state/roundState.js?v=20260712-direct-score-gross-fix"></script>
+  <script src="src/state/roundState.js?v=20260714-chicago-points"></script>
   <script src="src/state/roundStorage.js?v=20260709-v098-menu"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="src/cloud/supabaseConfig.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/supabaseClient.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/roundCloudService.js?v=20260712-final-round-sync"></script>
-  <script src="src/ui/dom.js?v=20260712-active-round-selection"></script>
+  <script src="src/ui/dom.js?v=20260714-commissioner-navigation"></script>
   <script src="src/ui/formatters.js?v=20260710-index-course-handicap"></script>
-  <script src="src/ui/setupView.js?v=20260712-phase2b-cloud-first"></script>
+  <script src="src/ui/setupView.js?v=20260714-points-participation"></script>
   <script src="src/ui/holeView.js?v=20260712-direct-score-gross-fix"></script>
-  <script src="src/ui/leaderboardView.js?v=20260712-leaderboard-to-par"></script>
+  <script src="src/ui/leaderboardView.js?v=20260714-dynamic-leaderboard-ranking"></script>
   <script src="src/ui/pointsPayoutView.js?v=20260710-points-quota"></script>
   <script src="src/ui/skinsView.js?v=20260709-v098-menu"></script>
   <script src="src/ui/finalSummaryView.js?v=20260711-dnf"></script>
@@ -528,6 +543,6 @@
   <script src="src/ui/playerManagementView.js?v=20260711-cloud-roster-save"></script>
   <script src="src/ui/groupSetupView.js?v=20260710-flex-hole-order"></script>
   <script src="src/ui/eventSummaryView.js?v=20260710-round-setup"></script>
-  <script src="src/app.js?v=20260712-reset-local-device"></script>
+  <script src="src/app.js?v=20260714-commissioner-navigation"></script>
 </body>
 </html>

@@ -74,7 +74,27 @@ window.OGSGolf.state.createRoundState = function createRoundState(
 
   function getPointsQuota(player) {
     const playingHandicap = courseHandicaps[player.id] ?? getCourseHandicap(player, course);
-    return Math.ceil((36 - (playingHandicap * 2)) * 2) / 2;
+    return 36 - playingHandicap;
+  }
+
+  function getPlayerHolesToPlay(player) {
+    const groupIndex = (roundSettings.groups || []).findIndex((group) => group.includes(player.id));
+    const groupRecord = groupIndex >= 0 ? roundSettings.groupRecords?.[groupIndex] : null;
+    return Number(groupRecord?.holesToPlay || groupRecord?.holes_to_play || totalHoles);
+  }
+
+  function getPointsTarget(player, section = "overall") {
+    const overallQuota = getPointsQuota(player);
+    const sideQuota = overallQuota / 2;
+    const holesToPlay = getPlayerHolesToPlay(player);
+
+    if (section === "front" || section === "back") return sideQuota;
+    return holesToPlay <= 9 ? sideQuota : overallQuota;
+  }
+
+  function getPointsHolesNeeded(player, section = "overall") {
+    if (section === "front" || section === "back") return 9;
+    return getPlayerHolesToPlay(player) <= 9 ? 9 : totalHoles;
   }
 
   function getHoleForPlayer(player, holeIndex = currentHoleIndex) {
@@ -148,9 +168,9 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         backHolesPlayed: 0,
         holesPlayed: 0,
         pointsQuota: getPointsQuota(player),
-        frontPointsTarget: getPointsQuota(player),
-        backPointsTarget: getPointsQuota(player),
-        overallPointsTarget: getPointsQuota(player) * 2
+        frontPointsTarget: getPointsTarget(player, "front"),
+        backPointsTarget: getPointsTarget(player, "back"),
+        overallPointsTarget: getPointsTarget(player, "overall")
       }
     );
   }
@@ -198,7 +218,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         target: 0,
         quota: getPointsQuota(player),
         holesPlayed: getPlayerTotals(player).holesPlayed,
-        holesNeeded: section === "overall" ? 18 : 9,
+        holesNeeded: getPointsHolesNeeded(player, section),
         isComplete: false,
         differential: Number.NEGATIVE_INFINITY,
         display: formatDnfStatus(player)
@@ -221,7 +241,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       back: totals.backHolesPlayed,
       overall: totals.holesPlayed
     }[section];
-    const holesNeeded = section === "overall" ? 18 : 9;
+    const holesNeeded = getPointsHolesNeeded(player, section);
     const isComplete = holesPlayed >= holesNeeded;
     const differential = points - target;
 

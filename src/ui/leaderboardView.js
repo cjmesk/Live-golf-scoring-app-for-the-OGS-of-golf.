@@ -29,6 +29,7 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
     return {
       actualStrokes,
       holesCompleted: savedHoles.length,
+      toPar,
       display: savedHoles.length === 0
         ? "-"
         : toPar === 0
@@ -37,65 +38,153 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
     };
   }
 
-  const standings = players
+  function getGameStatus(player) {
+    return [
+      roundState.isInSkins(player) ? "Skins" : "Not in Skins",
+      roundState.isInPoints(player) ? "Points" : "Not in Points",
+      player.inTeamChallenge === true ? "Team Event" : "Not in Team Event"
+    ].join(" | ");
+  }
+
+  function makeSection(title) {
+    const section = document.createElement("section");
+    section.className = "leaderboard-subsection";
+    section.innerHTML = `<h3>${title}</h3>`;
+    elements.leaderboard.appendChild(section);
+    return section;
+  }
+
+  function addRankLabels(standings, isTie) {
+    let currentRank = 1;
+
+    return standings.map((standing, index) => {
+      const tiedWithPrevious = index > 0 && isTie(standing, standings[index - 1]);
+      const tiedWithNext = index < standings.length - 1 && isTie(standing, standings[index + 1]);
+
+      if (!tiedWithPrevious) {
+        currentRank = index + 1;
+      }
+
+      return {
+        ...standing,
+        rank: currentRank,
+        rankLabel: tiedWithPrevious || tiedWithNext ? `T${currentRank}` : String(currentRank)
+      };
+    });
+  }
+
+  function renderGrossRow(section, standing) {
+    const { player, totals, scoreToPar } = standing;
+    const isDnf = roundState.isPlayerDnf(player);
+    const dnfText = roundState.formatDnfStatus(player);
+    const row = document.createElement("div");
+
+    row.className = "leaderboard-row";
+    row.innerHTML = `
+      <div class="rank">${standing.rankLabel}</div>
+      <div>
+        <div class="player-name">${player.name}</div>
+        <div class="player-details">Index ${player.handicap} | Course Handicap ${roundState.courseHandicaps[player.id]} | ${player.tee} tees</div>
+        <div class="player-details">${isDnf ? dnfText : `${totals.holesPlayed}/${totalHoles} holes saved`}</div>
+        <div class="player-details">${getGameStatus(player)}</div>
+      </div>
+      <div class="leaderboard-totals">
+        ${isDnf ? `<span class="points">DNF</span>` : ""}
+        <span class="gross">Strokes ${scoreToPar.holesCompleted === 0 ? "-" : scoreToPar.actualStrokes}</span>
+        <span class="gross">${scoreToPar.holesCompleted}/${totalHoles} holes</span>
+        <span class="gross">${scoreToPar.display}</span>
+      </div>
+    `;
+    section.appendChild(row);
+  }
+
+  function renderPointsRow(section, standing) {
+    const { player, totals } = standing;
+    const frontPointsResult = roundState.getPointsDifferential(player, "front");
+    const backPointsResult = roundState.getPointsDifferential(player, "back");
+    const overallPointsResult = standing.pointsResult;
+    const row = document.createElement("div");
+
+    row.className = "leaderboard-row leaderboard-points-row";
+    row.innerHTML = `
+      <div class="rank">${standing.rankLabel}</div>
+      <div>
+        <div class="player-name">${player.name}</div>
+        <div class="player-details">Chicago Quota ${overallPointsResult.target} overall (${frontPointsResult.target} front / ${backPointsResult.target} back)</div>
+        <div class="player-details">${totals.holesPlayed}/${totalHoles} holes saved</div>
+      </div>
+      <div class="leaderboard-totals">
+        <span class="points">${overallPointsResult.display}</span>
+        <span class="gross">Total ${totals.points} pts</span>
+        <span class="gross">Front ${totals.frontPoints} pts / ${frontPointsResult.display}</span>
+        <span class="gross">Back ${totals.backPoints} pts / ${backPointsResult.display}</span>
+      </div>
+    `;
+    section.appendChild(row);
+  }
+
+  const grossStandings = addRankLabels(players
+    .map((player) => ({
+      player,
+      totals: roundState.getPlayerTotals(player),
+      scoreToPar: getScoreToPar(player)
+    }))
+    .sort((a, b) => {
+      if (a.scoreToPar.holesCompleted === 0 && b.scoreToPar.holesCompleted > 0) {
+        return 1;
+      }
+
+      if (b.scoreToPar.holesCompleted === 0 && a.scoreToPar.holesCompleted > 0) {
+        return -1;
+      }
+
+      if (a.scoreToPar.toPar !== b.scoreToPar.toPar) {
+        return a.scoreToPar.toPar - b.scoreToPar.toPar;
+      }
+
+      if (a.scoreToPar.actualStrokes !== b.scoreToPar.actualStrokes) {
+        return a.scoreToPar.actualStrokes - b.scoreToPar.actualStrokes;
+      }
+
+      return a.player.name.localeCompare(b.player.name);
+    }), (a, b) =>
+      a.scoreToPar.toPar === b.scoreToPar.toPar
+      && a.scoreToPar.actualStrokes === b.scoreToPar.actualStrokes
+    );
+  const pointsStandings = addRankLabels(players
+    .filter((player) => pointsEnabled && roundState.isInPoints(player) && !roundState.isPlayerDnf(player))
     .map((player) => ({
       player,
       totals: roundState.getPlayerTotals(player),
       pointsResult: roundState.getPointsDifferential(player, "overall")
     }))
     .sort((a, b) => {
-      if (pointsEnabled && roundState.isInPoints(a.player) !== roundState.isInPoints(b.player)) {
-        return roundState.isInPoints(a.player) ? -1 : 1;
-      }
-
-      if (pointsEnabled && b.pointsResult.differential !== a.pointsResult.differential) {
+      if (b.pointsResult.differential !== a.pointsResult.differential) {
         return b.pointsResult.differential - a.pointsResult.differential;
       }
 
-      if (pointsEnabled && b.totals.points !== a.totals.points) {
+      if (b.totals.points !== a.totals.points) {
         return b.totals.points - a.totals.points;
       }
 
-      return a.totals.gross - b.totals.gross;
-    });
+      return a.player.name.localeCompare(b.player.name);
+    }), (a, b) =>
+      a.pointsResult.differential === b.pointsResult.differential
+      && a.totals.points === b.totals.points
+    );
 
   elements.leaderboard.innerHTML = "";
 
-  standings.forEach((standing, index) => {
-    const { player, totals } = standing;
-    const isDnf = roundState.isPlayerDnf(player);
-    const dnfText = roundState.formatDnfStatus(player);
-    const frontPointsResult = roundState.getPointsDifferential(player, "front");
-    const backPointsResult = roundState.getPointsDifferential(player, "back");
-    const overallPointsResult = standing.pointsResult;
-    const scoreToPar = getScoreToPar(player);
-    const gameStatus = [
-      roundState.isInSkins(player) ? "Skins" : "Not in Skins",
-      roundState.isInPoints(player) ? "Points" : "Not in Points",
-      player.inTeamChallenge === true ? "Team Event" : "Not in Team Event"
-    ].join(" | ");
-    const row = document.createElement("div");
-    row.className = "leaderboard-row";
-    row.innerHTML = `
-      <div class="rank">${index + 1}</div>
-      <div>
-        <div class="player-name">${player.name}</div>
-        <div class="player-details">Index ${player.handicap} | Course Handicap ${roundState.courseHandicaps[player.id]} | ${player.tee} tees</div>
-        <div class="player-details">${isDnf ? dnfText : `${totals.holesPlayed}/${totalHoles} holes saved`}</div>
-        <div class="player-details">${gameStatus}</div>
-      </div>
-      <div class="leaderboard-totals">
-        ${isDnf ? `<span class="points">DNF</span>` : ""}
-        ${!isDnf && pointsEnabled && roundState.isInPoints(player) ? `<span class="points">${overallPointsResult.display}</span>` : ""}
-        ${!isDnf && pointsEnabled && !roundState.isInPoints(player) ? `<span class="gross">Not in Points</span>` : ""}
-        ${!isDnf && pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">Quota ${frontPointsResult.quota} per side / ${overallPointsResult.target} overall</span>` : ""}
-        ${!isDnf && pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">${totals.points} pts earned</span>` : ""}
-        ${!isDnf && pointsEnabled && roundState.isInPoints(player) ? `<span class="gross">Front ${frontPointsResult.display} | Back ${backPointsResult.display}</span>` : ""}
-        <span class="gross">Strokes ${scoreToPar.holesCompleted === 0 ? "-" : scoreToPar.actualStrokes}</span>
-        <span class="gross">${scoreToPar.holesCompleted}/${totalHoles} holes</span>
-        <span class="gross">${scoreToPar.display}</span>
-      </div>
-    `;
-    elements.leaderboard.appendChild(row);
-  });
+  const grossSection = makeSection("Gross Leaderboard");
+  grossStandings.forEach((standing) => renderGrossRow(grossSection, standing));
+
+  if (pointsEnabled) {
+    const pointsSection = makeSection("Chicago Points Leaderboard");
+
+    if (pointsStandings.length === 0) {
+      pointsSection.insertAdjacentHTML("beforeend", `<div class="empty-state">No players entered in the Points Game.</div>`);
+    } else {
+      pointsStandings.forEach((standing) => renderPointsRow(pointsSection, standing));
+    }
+  }
 };

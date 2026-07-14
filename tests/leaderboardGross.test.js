@@ -33,6 +33,12 @@ assertEqual(window.OGSGolf.rules.getHoleResult(7, 5), "Double Bogey", "Two over"
 assertEqual(window.OGSGolf.rules.getHoleResult(8, 5), "Triple Bogey", "Three over");
 assertEqual(window.OGSGolf.rules.getHoleResult(9, 5), "Quadruple Bogey", "Four over");
 assertEqual(window.OGSGolf.rules.getHoleResult(10, 5), "+5", "Five over");
+assertEqual(window.OGSGolf.rules.getPoints(2, 5), 16, "Albatross Chicago points");
+assertEqual(window.OGSGolf.rules.getPoints(3, 5), 8, "Eagle Chicago points");
+assertEqual(window.OGSGolf.rules.getPoints(4, 5), 4, "Birdie Chicago points");
+assertEqual(window.OGSGolf.rules.getPoints(5, 5), 2, "Par Chicago points");
+assertEqual(window.OGSGolf.rules.getPoints(6, 5), 1, "Bogey Chicago points");
+assertEqual(window.OGSGolf.rules.getPoints(7, 5), 0, "Double bogey Chicago points");
 
 const pars = [4, 3, 5, 4, 4, 3, 4, 4, 5, 4, 4, 3, 5, 4, 4, 3, 4, 4];
 const course = {
@@ -59,6 +65,35 @@ const players = [
   { id: "player-a", name: "Player A", handicap: 0, tee: "white", inPoints: false, inSkins: false },
   { id: "player-b", name: "Player B", handicap: 0, tee: "white", inPoints: false, inSkins: false }
 ];
+const chicagoPlayer = { id: "chicago-player", name: "Chicago Player", handicap: 10, tee: "white", inPoints: true, inSkins: false };
+const chicagoRoundState = window.OGSGolf.state.createRoundState(course, [chicagoPlayer], {
+  course,
+  players: [chicagoPlayer],
+  groups: [["chicago-player"]],
+  groupRecords: [{ holesToPlay: 18 }],
+  games: {
+    pointsGame: { enabled: true },
+    netSkins: { enabled: false }
+  },
+  playerStatuses: {}
+});
+const chicagoNineRoundState = window.OGSGolf.state.createRoundState(course, [chicagoPlayer], {
+  course,
+  players: [chicagoPlayer],
+  groups: [["chicago-player"]],
+  groupRecords: [{ holesToPlay: 9 }],
+  games: {
+    pointsGame: { enabled: true },
+    netSkins: { enabled: false }
+  },
+  playerStatuses: {}
+});
+
+assertEqual(chicagoRoundState.getPointsQuota(chicagoPlayer), 26, "Chicago overall quota uses 36 minus Course Handicap");
+assertEqual(chicagoRoundState.getPointsDifferential(chicagoPlayer, "front").target, 13, "Chicago front quota is half overall quota");
+assertEqual(chicagoRoundState.getPointsDifferential(chicagoPlayer, "back").target, 13, "Chicago back quota is half overall quota");
+assertEqual(chicagoRoundState.getPointsDifferential(chicagoPlayer, "overall").target, 26, "Chicago 18-hole overall target");
+assertEqual(chicagoNineRoundState.getPointsDifferential(chicagoPlayer, "overall").target, 13, "Chicago 9-hole target is half overall quota");
 const roundState = window.OGSGolf.state.createRoundState(course, players, {
   course,
   players,
@@ -105,6 +140,9 @@ const leaderboardElement = {
   innerHTML: "",
   rows: [],
   appendChild(row) {
+    row.onChildAppend = (html) => {
+      this.innerHTML += html;
+    };
     this.rows.push(row);
     this.innerHTML += row.innerHTML;
   }
@@ -114,7 +152,19 @@ global.document = {
   createElement() {
     return {
       className: "",
-      innerHTML: ""
+      innerHTML: "",
+      appendChild(child) {
+        this.innerHTML += child.innerHTML;
+        if (typeof this.onChildAppend === "function") {
+          this.onChildAppend(child.innerHTML);
+        }
+      },
+      insertAdjacentHTML(_position, html) {
+        this.innerHTML += html;
+        if (typeof this.onChildAppend === "function") {
+          this.onChildAppend(html);
+        }
+      }
     };
   }
 };
@@ -176,6 +226,9 @@ const entryLeaderboardElement = {
   innerHTML: "",
   rows: [],
   appendChild(row) {
+    row.onChildAppend = (html) => {
+      this.innerHTML += html;
+    };
     this.rows.push(row);
     this.innerHTML += row.innerHTML;
   }
@@ -222,8 +275,16 @@ assertEqual(playerBLocalGross, 9, "Player B localStorage-shaped gross");
 const savePathLeaderboardElement = {
   innerHTML: "",
   rows: [],
+  sections: [],
   appendChild(row) {
-    this.rows.push(row);
+    row.onChildAppend = (html) => {
+      this.innerHTML += html;
+    };
+    if (row.className === "leaderboard-subsection") {
+      this.sections.push(row);
+    } else {
+      this.rows.push(row);
+    }
     this.innerHTML += row.innerHTML;
   }
 };
@@ -239,3 +300,73 @@ if (!savePathLeaderboardElement.innerHTML.includes("Strokes 9")) {
 }
 
 console.log("Displayed-score save path test passed.");
+
+const splitLeaderboardPlayers = [
+  { id: "gross-only", name: "Gross Only", handicap: 0, tee: "white", inPoints: false, inSkins: false },
+  { id: "points-player", name: "Points Player", handicap: 0, tee: "white", inPoints: true, inSkins: false },
+  { id: "tie-player", name: "Tie Player", handicap: 0, tee: "white", inPoints: true, inSkins: false }
+];
+const splitLeaderboardRoundState = window.OGSGolf.state.createRoundState(course, splitLeaderboardPlayers, {
+  course,
+  players: splitLeaderboardPlayers,
+  groups: [["gross-only", "points-player", "tie-player"]],
+  groupRecords: [{ holesToPlay: 18 }],
+  games: {
+    pointsGame: { enabled: true },
+    netSkins: { enabled: false }
+  },
+  playerStatuses: {}
+});
+
+splitLeaderboardRoundState.applyCloudHoleScores([
+  { player_id: "gross-only", hole: 1, gross: 4, strokes_received: 0, net: 4 },
+  { player_id: "points-player", hole: 1, gross: 3, strokes_received: 0, net: 3 },
+  { player_id: "tie-player", hole: 1, gross: 3, strokes_received: 0, net: 3 }
+]);
+
+const splitLeaderboardElement = {
+  innerHTML: "",
+  sections: [],
+  appendChild(section) {
+    section.onChildAppend = (html) => {
+      this.innerHTML += html;
+    };
+    this.sections.push(section);
+    this.innerHTML += section.innerHTML;
+  }
+};
+
+window.OGSGolf.ui.renderLeaderboard({ leaderboard: splitLeaderboardElement }, splitLeaderboardPlayers, splitLeaderboardRoundState);
+
+if (!splitLeaderboardElement.innerHTML.includes("Gross Leaderboard")) {
+  throw new Error("Leaderboard did not render a separate Gross Leaderboard section.");
+}
+
+if (!splitLeaderboardElement.innerHTML.includes("Chicago Points Leaderboard")) {
+  throw new Error("Leaderboard did not render a separate Chicago Points section.");
+}
+
+const grossSection = splitLeaderboardElement.sections.find((section) => section.innerHTML.includes("Gross Leaderboard"));
+const pointsSection = splitLeaderboardElement.sections.find((section) => section.innerHTML.includes("Chicago Points Leaderboard"));
+
+if (!grossSection.innerHTML.includes("Gross Only") || !grossSection.innerHTML.includes("Points Player") || !grossSection.innerHTML.includes("Tie Player")) {
+  throw new Error("Gross leaderboard must include every player.");
+}
+
+if (grossSection.innerHTML.indexOf("Points Player") > grossSection.innerHTML.indexOf("Gross Only")) {
+  throw new Error("Gross leaderboard must rank better score-to-par above roster order.");
+}
+
+if (!grossSection.innerHTML.includes("<div class=\"rank\">T1</div>")) {
+  throw new Error("Gross leaderboard must display tied players with tied rank labels.");
+}
+
+if (pointsSection.innerHTML.includes("Gross Only") || !pointsSection.innerHTML.includes("Points Player") || !pointsSection.innerHTML.includes("Tie Player")) {
+  throw new Error("Chicago points leaderboard must include only points participants.");
+}
+
+if (!pointsSection.innerHTML.includes("<div class=\"rank\">T1</div>")) {
+  throw new Error("Chicago points leaderboard must display tied players with tied rank labels.");
+}
+
+console.log("Split gross and Chicago leaderboard test passed.");

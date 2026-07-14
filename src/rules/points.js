@@ -6,7 +6,8 @@ window.OGSGolf.rules.getPoints = function getPoints(score, par) {
 
   const difference = Number(score) - par;
 
-  if (difference <= -2) return 6;
+  if (difference <= -3) return 16;
+  if (difference === -2) return 8;
   if (difference === -1) return 4;
   if (difference === 0) return 2;
   if (difference === 1) return 1;

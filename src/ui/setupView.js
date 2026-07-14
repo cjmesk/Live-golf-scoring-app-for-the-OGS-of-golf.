@@ -36,8 +36,10 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
 
   const selectedMemberIds = elements.memberList.selectedMemberIds || new Set();
   const teeOverrides = elements.memberList.teeOverrides || new Map();
+  const pointsParticipation = elements.memberList.pointsParticipation || new Map();
   elements.memberList.selectedMemberIds = selectedMemberIds;
   elements.memberList.teeOverrides = teeOverrides;
+  elements.memberList.pointsParticipation = pointsParticipation;
   elements.gameList.innerHTML = "";
   elements.teamAssignmentPanel.classList.add("is-hidden");
   elements.teamAssignmentList.innerHTML = "";
@@ -68,6 +70,7 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
 
     visibleMembers.forEach((member) => {
       const isPlayingToday = selectedMemberIds.has(member.id);
+      const isInPointsGame = isPlayingToday && pointsParticipation.get(member.id) === true;
       const row = document.createElement("div");
       row.className = "member-row";
       row.innerHTML = `
@@ -86,6 +89,10 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
             `).join("")}
           </select>
         </label>
+        <label class="member-game-check">
+          <input type="checkbox" data-points-for="${member.id}"${isInPointsGame ? " checked" : ""}${isPlayingToday ? "" : " disabled"}>
+          <span>Points Game</span>
+        </label>
       `;
       elements.memberList.appendChild(row);
     });
@@ -99,18 +106,27 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
   elements.memberList.onchange = (event) => {
     const checkbox = event.target.closest("[data-member-id]");
     const teeSelect = event.target.closest("[data-tee-for]");
+    const pointsCheckbox = event.target.closest("[data-points-for]");
 
     if (checkbox?.checked) {
       selectedMemberIds.add(checkbox.dataset.memberId);
     } else if (checkbox) {
       selectedMemberIds.delete(checkbox.dataset.memberId);
+      pointsParticipation.delete(checkbox.dataset.memberId);
     }
 
     if (teeSelect) {
       teeOverrides.set(teeSelect.dataset.teeFor, teeSelect.value);
     }
 
+    if (pointsCheckbox) {
+      pointsParticipation.set(pointsCheckbox.dataset.pointsFor, pointsCheckbox.checked);
+    }
+
     updateSelectedCount();
+    if (checkbox) {
+      renderMemberRows();
+    }
   };
 };
 
@@ -118,6 +134,7 @@ window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, cours
   const course = courses.find((item) => item.id === elements.courseSelect.value) || courses[0];
   const selectedMemberIds = elements.memberList.selectedMemberIds || new Set();
   const teeOverrides = elements.memberList.teeOverrides || new Map();
+  const pointsParticipation = elements.memberList.pointsParticipation || new Map();
   const roundDate = elements.roundDate.value || getTodayInputValue();
   const enteredRoundName = elements.roundName.value.trim();
   const roundName = enteredRoundName || `${course.name} - ${roundDate}`;
@@ -127,10 +144,14 @@ window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, cours
       ...member,
       tee: teeOverrides.get(member.id) || member.tee,
       inSkins: false,
-      inPoints: false,
+      inPoints: pointsParticipation.get(member.id) === true,
       inTeamChallenge: false,
       teamId: ""
     }));
+  const hasPointsPlayers = selectedPlayers.some((player) => player.inPoints === true);
+  const games = createDisabledGames();
+
+  games.pointsGame.enabled = hasPointsPlayers;
 
   return {
     id: `round-${Date.now()}`,
@@ -149,7 +170,7 @@ window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, cours
     eventStatus: "Setup",
     setupLocked: false,
     preRoundReviewComplete: false,
-    games: createDisabledGames()
+    games
   };
 };
 

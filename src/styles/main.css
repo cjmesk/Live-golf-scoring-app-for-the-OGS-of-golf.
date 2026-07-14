@@ -277,6 +277,21 @@ body.is-scoring h1 {
   display: none;
 }
 
+.commissioner-group-selection {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.round-screen.is-commissioner-group-selection .hole-section,
+.round-screen.is-commissioner-group-selection .leaderboard-section {
+  display: none;
+}
+
 .round-screen.is-leaderboard-view .hole-section {
   display: none;
 }
@@ -479,6 +494,7 @@ body.is-scoring .current-hole-status {
 }
 
 .member-check,
+.member-game-check,
 .game-toggle {
   display: grid;
   grid-template-columns: 24px 1fr;
@@ -492,10 +508,22 @@ body.is-scoring .current-hole-status {
 }
 
 .member-check input,
+.member-game-check input,
 .game-toggle input {
   width: 20px;
   height: 20px;
   margin-top: 2px;
+}
+
+.member-game-check {
+  align-items: center;
+  color: var(--green-dark);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.member-game-check input:disabled + span {
+  color: var(--muted);
 }
 
 .member-check span span,
@@ -947,6 +975,21 @@ body.is-scoring .current-hole-status {
   gap: 10px;
   align-items: center;
   padding: 12px;
+}
+
+.leaderboard-subsection {
+  display: grid;
+  gap: 8px;
+}
+
+.leaderboard-subsection + .leaderboard-subsection {
+  margin-top: 14px;
+}
+
+.leaderboard-subsection h3 {
+  margin: 0;
+  color: var(--green-dark);
+  font-size: 1rem;
 }
 
 .rank {

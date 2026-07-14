@@ -258,7 +258,7 @@ async function openSetupWizard({ focusTeamSetup = false } = {}) {
   }
 }
 
-function showLiveScoring() {
+async function showLiveScoring() {
   if (!roundState) {
     if (commissionerMode) {
       openSetupWizard();
@@ -273,6 +273,11 @@ function showLiveScoring() {
   if (!commissionerMode && !currentScorerId) {
     renderScorerSelection();
     elements.scorerAccessStatus.textContent = "Choose the scorer assigned to this device for this match.";
+    return;
+  }
+
+  if (commissionerMode) {
+    await showCommissionerGroupSelection();
     return;
   }
 
@@ -653,6 +658,80 @@ function renderScoreOverrideControls() {
   }
 }
 
+function hideCommissionerGroupSelection() {
+  elements.roundScreen?.classList.remove("is-commissioner-group-selection");
+  elements.commissionerGroupSelection?.classList.add("is-hidden");
+}
+
+function getCommissionerGroupRowText(groupIndex) {
+  const record = getGroupRecord(groupIndex);
+  const complete = isGroupComplete(groupIndex) || record.status === "completed";
+  const statusText = complete ? "Complete" : `Hole ${record.currentHole || 1}`;
+  const actionText = complete ? "Review Scores" : "Open Scoring";
+
+  return {
+    statusText,
+    actionText
+  };
+}
+
+function renderCommissionerGroupSelection() {
+  if (!elements.commissionerGroupSelection || !elements.commissionerGroupSelectionList) return;
+
+  syncAllGroupCompletionsFromScores();
+  setActiveScreen("round");
+  elements.roundScreen.classList.remove("is-leaderboard-view", "is-group-complete");
+  elements.roundScreen.classList.add("is-commissioner-group-selection");
+  elements.commissionerGroupSelection.classList.remove("is-hidden");
+
+  elements.commissionerGroupSelectionList.innerHTML = roundSettings.groups
+    .map((group, index) => {
+      const record = getGroupRecord(index);
+      const activeClass = index === currentGroupIndex ? " is-active" : "";
+      const { statusText, actionText } = getCommissionerGroupRowText(index);
+
+      return `
+        <button type="button" class="score-override-row${activeClass}" data-commissioner-group-index="${index}">
+          <strong>Group ${index + 1} - ${statusText} - ${actionText}</strong>
+          <span>Scorer: ${getGroupScorerName(index)}</span>
+          <span>${group.length} players | Starting hole ${record.startingHole || 1} | ${record.completedHoleNumbers.length}/${record.holesToPlay} holes saved</span>
+        </button>
+      `;
+    })
+    .join("");
+
+  renderLeaderboard(elements, selectedPlayers, roundState);
+}
+
+async function showCommissionerGroupSelection({ refresh = true } = {}) {
+  if (!commissionerMode || !roundState || !roundSettings?.groups?.length) return;
+
+  if (refresh && roundState.id) {
+    elements.liveRefreshStatus.textContent = "Checking live group status...";
+    const refreshResult = await applyCloudScoreStateForActiveRound(roundState.id);
+    elements.liveRefreshStatus.textContent = refreshResult.ok
+      ? "Live group status updated."
+      : (refreshResult.message || "Cloud status check failed. Showing this device's saved copy.");
+  }
+
+  renderCommissionerGroupSelection();
+  scrollToTop();
+}
+
+async function openCommissionerGroup(groupIndex) {
+  if (!commissionerMode || !roundSettings?.groups?.length) return;
+
+  if (roundState?.id) {
+    elements.liveRefreshStatus.textContent = "Loading selected group from cloud...";
+    const refreshResult = await applyCloudScoreStateForActiveRound(roundState.id);
+    elements.liveRefreshStatus.textContent = refreshResult.ok
+      ? `Group ${groupIndex + 1} loaded.`
+      : (refreshResult.message || "Cloud load failed. Showing this device's saved copy.");
+  }
+
+  goToGroup(groupIndex);
+}
+
 function mergeRoster(localPlayers, cloudPlayers) {
   const mergedById = new Map();
 
@@ -972,6 +1051,7 @@ function renderGroupCompletionSummary() {
 function renderCompletedGroupPage() {
   const record = getGroupRecord(currentGroupIndex);
   const rows = getGroupGrossRows(currentGroupIndex);
+  const allGroupsComplete = areAllGroupsComplete();
   const compactRows = rows.map((row) => `
     <div class="completed-gross-row">
       <strong>${row.player.name}</strong>
@@ -982,11 +1062,19 @@ function renderCompletedGroupPage() {
 
   elements.completedGroupTitle.textContent = `Group ${currentGroupIndex + 1} Round Complete`;
   elements.completedGroupMessage.textContent =
-    `Group ${currentGroupIndex + 1} has completed all required holes. All gross scores have been saved.`;
+    commissionerMode && !allGroupsComplete
+      ? "Your group is complete. Other groups are still playing."
+      : `Group ${currentGroupIndex + 1} has completed all required holes. All gross scores have been saved.`;
   elements.completedGroupGrossSummary.innerHTML = compactRows;
-  elements.completedGroupStatus.textContent = areAllGroupsComplete()
+  elements.completedGroupStatus.textContent = allGroupsComplete
     ? "All groups have completed the round. The commissioner may now review and close the event."
-    : "Waiting for the remaining groups to finish.";
+    : commissionerMode
+      ? "Manage remaining groups to score or review another group."
+      : "Waiting for the remaining groups to finish.";
+  elements.reviewGroupScores.textContent = commissionerMode ? "Review This Group" : "Review My Group Scores";
+  elements.activeRoundManagement.textContent = commissionerMode && !allGroupsComplete
+    ? "Manage Remaining Groups"
+    : "Active Round Management";
   elements.activeRoundManagement.classList.toggle("is-hidden", !commissionerMode);
   elements.groupScoreReview.classList.add("is-hidden");
   elements.groupScoreReview.innerHTML = "";
@@ -1090,8 +1178,7 @@ function renderGroupScoreReview() {
 function showActiveRoundManagement() {
   if (!commissionerMode) return;
 
-  elements.completedGroupStatus.textContent =
-    "Commissioner Mode: use the main menu to manage the active round or select another group.";
+  showCommissionerGroupSelection({ refresh: false });
 }
 
 function openDnfConfirmation(playerId) {
@@ -1232,6 +1319,7 @@ function goToGroup(nextGroupIndex) {
   if (!roundSettings) return;
   if (!commissionerMode && roundSettings.groupScorers?.[nextGroupIndex] !== currentScorerId) return;
 
+  hideCommissionerGroupSelection();
   const previousGroupIndex = currentGroupIndex;
   currentGroupIndex = Math.max(0, Math.min(roundSettings.groups.length - 1, nextGroupIndex));
   if (currentGroupIndex !== previousGroupIndex) {
@@ -1278,6 +1366,9 @@ function goToHoleForCurrentGroup(nextHoleIndex) {
 }
 
 function renderApp() {
+  if (!elements.roundScreen.classList.contains("is-commissioner-group-selection")) {
+    hideCommissionerGroupSelection();
+  }
   renderRoundSettingsSummary(elements, roundSettings);
   renderCurrentHole();
   renderLeaderboard(elements, selectedPlayers, roundState);
@@ -1288,6 +1379,11 @@ function renderApp() {
 
 function showScoreMyGroup() {
   if (!roundState) return;
+
+  if (commissionerMode) {
+    showCommissionerGroupSelection({ refresh: false });
+    return;
+  }
 
   if (!commissionerMode && !currentScorerId) {
     renderScorerSelection();
@@ -1306,12 +1402,14 @@ function showScoreMyGroup() {
   }
 
   elements.roundScreen.classList.remove("is-leaderboard-view");
+  hideCommissionerGroupSelection();
   scrollToScoring();
 }
 
 function showLeaderboardPage() {
   if (!roundState) return;
 
+  hideCommissionerGroupSelection();
   renderLeaderboard(elements, selectedPlayers, roundState);
   elements.roundScreen.classList.add("is-leaderboard-view");
   scrollToTop();
@@ -1373,10 +1471,7 @@ function continueFromTodayRound() {
   viewOnlyMode = false;
   if (roundState) {
     if (commissionerMode) {
-      setActiveScreen("round");
-      renderApp();
-      showScoreMyGroup();
-      scrollToScoring();
+      showCommissionerGroupSelection();
       return;
     }
 
@@ -1447,10 +1542,7 @@ function choosePlayerOrScorer() {
 function openCommissionerFromToday() {
   if (commissionerMode) {
     if (roundState) {
-      setActiveScreen("round");
-      renderApp();
-      showScoreMyGroup();
-      scrollToScoring();
+      showCommissionerGroupSelection();
       return;
     }
 
@@ -2576,9 +2668,7 @@ elements.toggleCommissionerMode.addEventListener("click", () => {
   }
 
   if (commissionerMode && roundState) {
-    setActiveScreen("round");
-    renderApp();
-    scrollToScoring();
+    showCommissionerGroupSelection();
   }
 });
 function submitCommissionerPinFromKeyboard(event) {
@@ -2598,9 +2688,7 @@ function submitCommissionerPinFromKeyboard(event) {
   }
 
   if (commissionerMode && roundState) {
-    setActiveScreen("round");
-    renderApp();
-    scrollToScoring();
+    showCommissionerGroupSelection();
   }
 }
 
@@ -2728,6 +2816,16 @@ elements.scoreOverrideList.addEventListener("click", (event) => {
   enterScoreOverride(Number(groupButton.dataset.overrideGroupIndex));
 });
 
+elements.commissionerGroupSelectionList.addEventListener("click", (event) => {
+  const groupButton = event.target.closest("[data-commissioner-group-index]");
+
+  if (!groupButton) return;
+
+  openCommissionerGroup(Number(groupButton.dataset.commissionerGroupIndex));
+});
+
+elements.commissionerGroupSelectionLeaderboard.addEventListener("click", showLeaderboardPage);
+elements.commissionerGroupSelectionDashboard.addEventListener("click", showTodayRoundScreen);
 elements.exitScoreOverride.addEventListener("click", exitScoreOverride);
 
 elements.holeSelector.addEventListener("change", () => {
