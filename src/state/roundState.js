@@ -460,7 +460,8 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       summary[player.id] = {
         player,
         totalSkins: 0,
-        holesWon: []
+        holesWon: [],
+        holesWonDetails: []
       };
     });
 
@@ -468,8 +469,15 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       if (!skin?.winnerId) return;
       if (!summary[skin.winnerId]) return;
 
+      const winnerHoleResult = skin.holeResults?.find((result) => result.playerId === skin.winnerId);
       summary[skin.winnerId].totalSkins += 1;
       summary[skin.winnerId].holesWon.push(skin.hole);
+      summary[skin.winnerId].holesWonDetails.push({
+        hole: skin.hole,
+        skinsNetScore: winnerHoleResult?.skinScore ?? null,
+        netScore: winnerHoleResult?.skinScore ?? null,
+        scorecardNetScore: winnerHoleResult?.netScore ?? null
+      });
     });
 
     return summary;
@@ -486,33 +494,70 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     return Math.round(numericValue * 100) / 100;
   }
 
+  function moneyToCents(value) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return 0;
+    return Math.max(0, Math.round(numericValue * 100));
+  }
+
+  function centsToMoney(cents) {
+    return roundMoney(Number(cents || 0) / 100);
+  }
+
+  function allocateRoundedDollars(totalDollars, unitCount) {
+    if (!Number.isFinite(totalDollars) || unitCount <= 0) return [];
+
+    const wholeDollarPot = Math.round(totalDollars);
+    const exactShare = wholeDollarPot / unitCount;
+    const payouts = Array.from({ length: unitCount }, () => Math.round(exactShare));
+    let difference = wholeDollarPot - payouts.reduce((total, payout) => total + payout, 0);
+
+    if (difference > 0) {
+      for (let index = 0; difference > 0; index = (index + 1) % payouts.length) {
+        payouts[index] += 1;
+        difference -= 1;
+      }
+    }
+
+    if (difference < 0) {
+      for (let index = payouts.length - 1; difference < 0 && index >= 0; index -= 1) {
+        if (payouts[index] <= 0) continue;
+        payouts[index] -= 1;
+        difference += 1;
+      }
+    }
+
+    return payouts;
+  }
+
   function getPointsPayoutSummary() {
     const pointsPlayers = getPointsPlayers();
     const amountPerPlayer = getGameAmount("pointsGame");
     const enabled = roundSettings.games?.pointsGame?.enabled === true && pointsPlayers.length > 0;
-    const totalPot = enabled ? roundMoney(amountPerPlayer * pointsPlayers.length) : 0;
-    const sectionPot = enabled ? roundMoney(totalPot / 3) : 0;
+    const totalPot = enabled ? Math.round(amountPerPlayer * pointsPlayers.length) : 0;
+    const sectionPots = allocateRoundedDollars(totalPot, 3);
 
-    function getSection(section) {
+    function getSection(section, sectionIndex) {
       const result = getPointsLeaders(section);
       const winners = result.leaders || [];
-      const payoutPerWinner = winners.length > 0 ? roundMoney(sectionPot / winners.length) : 0;
+      const pot = sectionPots[sectionIndex] || 0;
+      const winnerPayouts = allocateRoundedDollars(pot, winners.length);
 
       return {
         section,
-        pot: sectionPot,
+        pot,
         points: result.points || 0,
         target: result.target || 0,
         differential: result.differential,
         display: result.display || "-",
-        winners: winners.map((winner) => ({
+        winners: winners.map((winner, winnerIndex) => ({
           playerId: winner.player.id,
           playerName: winner.player.name,
           points: winner.points || 0,
           target: winner.target || 0,
           differential: winner.differential,
           display: winner.display || "-",
-          payout: payoutPerWinner
+          payout: winnerPayouts[winnerIndex] || 0
         }))
       };
     }
@@ -522,10 +567,11 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       amountPerPlayer,
       participantCount: pointsPlayers.length,
       totalPot,
-      sectionPot,
-      front: getSection("front"),
-      back: getSection("back"),
-      overall: getSection("overall")
+      sectionPot: sectionPots[0] || 0,
+      sectionPots,
+      front: getSection("front", 0),
+      back: getSection("back", 1),
+      overall: getSection("overall", 2)
     };
   }
 
@@ -533,25 +579,45 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     const skinsPlayers = getSkinsPlayers();
     const amountPerPlayer = getGameAmount("netSkins");
     const enabled = roundSettings.games?.netSkins?.enabled === true && skinsPlayers.length > 0;
-    const totalPot = enabled ? roundMoney(amountPerPlayer * skinsPlayers.length) : 0;
+    const totalPot = enabled ? Math.round(amountPerPlayer * skinsPlayers.length) : 0;
+    const totalPotCents = totalPot * 100;
     const skinSummary = getSkinSummary();
     const winners = Object.values(skinSummary).filter((item) => item.totalSkins > 0);
     const totalWinningSkins = winners.reduce((total, item) => total + item.totalSkins, 0);
-    const payoutPerSkin = totalWinningSkins > 0 ? roundMoney(totalPot / totalWinningSkins) : 0;
+    const winningSkinUnits = winners
+      .flatMap((item) => (item.holesWonDetails || []).map((detail) => ({
+        playerId: item.player.id,
+        hole: detail.hole
+      })))
+      .sort((firstSkin, secondSkin) => {
+        if (firstSkin.hole !== secondSkin.hole) return firstSkin.hole - secondSkin.hole;
+        return firstSkin.playerId.localeCompare(secondSkin.playerId);
+      });
+    const skinDollarPayouts = allocateRoundedDollars(totalPot, winningSkinUnits.length);
+    const playerPayoutCents = {};
+
+    winningSkinUnits.forEach((skinUnit, index) => {
+      const skinPayoutCents = (skinDollarPayouts[index] || 0) * 100;
+      playerPayoutCents[skinUnit.playerId] =
+        (playerPayoutCents[skinUnit.playerId] || 0) + skinPayoutCents;
+    });
 
     return {
       enabled,
       amountPerPlayer,
       participantCount: skinsPlayers.length,
       totalPot,
+      totalPotCents,
       totalWinningSkins,
-      payoutPerSkin,
+      payoutPerSkin: skinDollarPayouts[0] || 0,
       winners: winners.map((item) => ({
         playerId: item.player.id,
         playerName: item.player.name,
         totalSkins: item.totalSkins,
         holesWon: item.holesWon,
-        payout: roundMoney(item.totalSkins * payoutPerSkin)
+        holesWonDetails: item.holesWonDetails || [],
+        payout: centsToMoney(playerPayoutCents[item.player.id] || 0),
+        payoutCents: playerPayoutCents[item.player.id] || 0
       }))
     };
   }
@@ -647,7 +713,8 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         skins: getSkinSummary()[player.id] || {
           player,
           totalSkins: 0,
-          holesWon: []
+          holesWon: [],
+          holesWonDetails: []
         }
       }))
     };

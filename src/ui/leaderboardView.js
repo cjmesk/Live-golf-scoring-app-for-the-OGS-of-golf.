@@ -3,6 +3,7 @@ window.OGSGolf.ui = window.OGSGolf.ui || {};
 
 window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, players, roundState) {
   const pointsEnabled = roundState.roundSettings.games.pointsGame.enabled;
+  const skinsEnabled = roundState.roundSettings.games.netSkins?.enabled === true;
   const totalHoles = roundState.totalHoles || 18;
 
   function isSavedScore(score) {
@@ -123,6 +124,50 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
     section.appendChild(row);
   }
 
+  function formatCurrency(value) {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? `$${numericValue.toFixed(2)}` : "$0.00";
+  }
+
+  function formatSkinHoleDetails(details = []) {
+    if (!details.length) return "-";
+
+    return details
+      .map((detail) => {
+        const skinsNetScore = detail.skinsNetScore ?? detail.skinScore ?? detail.netScore;
+        const netText = Number.isFinite(Number(skinsNetScore))
+          ? ` — Net ${skinsNetScore}`
+          : "";
+        return `Hole ${detail.hole}${netText}`;
+      })
+      .join(", ");
+  }
+
+  function renderSkinsRow(section, standing, payoutSummary) {
+    const { player, skins } = standing;
+    const winnerPayout = payoutSummary?.skins?.winners?.find((winner) => winner.playerId === player.id);
+    const estimatedText = winnerPayout && payoutSummary.skins.totalWinningSkins > 0
+      ? `Estimated value: ${formatCurrency(winnerPayout.payout)}`
+      : "Estimated value: -";
+    const row = document.createElement("div");
+
+    row.className = "leaderboard-row leaderboard-skins-row";
+    row.innerHTML = `
+      <div class="rank">${standing.rankLabel}</div>
+      <div>
+        <div class="player-name">${player.name}</div>
+        <div class="player-details">${skins.totalSkins} skin${skins.totalSkins === 1 ? "" : "s"} won</div>
+        <div class="player-details">${formatSkinHoleDetails(skins.holesWonDetails)}</div>
+        <div class="player-details">${estimatedText}</div>
+      </div>
+      <div class="leaderboard-totals">
+        <span class="points">${skins.totalSkins}</span>
+        <span class="gross">skins</span>
+      </div>
+    `;
+    section.appendChild(row);
+  }
+
   const grossStandings = addRankLabels(players
     .map((player) => ({
       player,
@@ -172,12 +217,48 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
       a.pointsResult.differential === b.pointsResult.differential
       && a.totals.points === b.totals.points
     );
+  const skinSummary = roundState.getSkinSummary();
+  const payoutSummary = roundState.getPayoutSummary?.();
+  const skinsStandings = addRankLabels(players
+    .filter((player) => skinsEnabled && roundState.isInSkins(player) && !roundState.isPlayerDnf(player))
+    .map((player) => ({
+      player,
+      skins: skinSummary[player.id] || {
+        totalSkins: 0,
+        holesWon: [],
+        holesWonDetails: []
+      }
+    }))
+    .sort((a, b) => {
+      if (b.skins.totalSkins !== a.skins.totalSkins) {
+        return b.skins.totalSkins - a.skins.totalSkins;
+      }
+
+      return a.player.name.localeCompare(b.player.name);
+    }), (a, b) => a.skins.totalSkins === b.skins.totalSkins
+    );
 
   elements.leaderboard.innerHTML = "";
 
   if (pointsStandings.length > 0) {
     const pointsSection = makeSection("Points Leaderboard");
     pointsStandings.forEach((standing) => renderPointsRow(pointsSection, standing));
+  }
+
+  if (skinsEnabled) {
+    const skinsSection = makeSection("Skins Leaderboard");
+    if (skinsStandings.some((standing) => standing.skins.totalSkins > 0)) {
+      skinsStandings.forEach((standing) => renderSkinsRow(skinsSection, standing, payoutSummary));
+    } else {
+      skinsSection.innerHTML += `
+        <div class="leaderboard-row">
+          <div>
+            <div class="player-name">No skins won yet</div>
+            <div class="player-details">A skin appears after a completed hole has one unique net winner.</div>
+          </div>
+        </div>
+      `;
+    }
   }
 
   const grossSection = makeSection("Gross Leaderboard");
