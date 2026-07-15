@@ -37,9 +37,11 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
   const selectedMemberIds = elements.memberList.selectedMemberIds || new Set();
   const teeOverrides = elements.memberList.teeOverrides || new Map();
   const pointsParticipation = elements.memberList.pointsParticipation || new Map();
+  const skinsParticipation = elements.memberList.skinsParticipation || new Map();
   elements.memberList.selectedMemberIds = selectedMemberIds;
   elements.memberList.teeOverrides = teeOverrides;
   elements.memberList.pointsParticipation = pointsParticipation;
+  elements.memberList.skinsParticipation = skinsParticipation;
   elements.gameList.innerHTML = "";
   elements.teamAssignmentPanel.classList.add("is-hidden");
   elements.teamAssignmentList.innerHTML = "";
@@ -71,6 +73,7 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
     visibleMembers.forEach((member) => {
       const isPlayingToday = selectedMemberIds.has(member.id);
       const isInPointsGame = isPlayingToday && pointsParticipation.get(member.id) === true;
+      const isInSkinsGame = isPlayingToday && skinsParticipation.get(member.id) === true;
       const row = document.createElement("div");
       row.className = "member-row";
       row.innerHTML = `
@@ -93,6 +96,10 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
           <input type="checkbox" data-points-for="${member.id}"${isInPointsGame ? " checked" : ""}${isPlayingToday ? "" : " disabled"}>
           <span>Points Game</span>
         </label>
+        <label class="member-game-check">
+          <input type="checkbox" data-skins-for="${member.id}"${isInSkinsGame ? " checked" : ""}${isPlayingToday ? "" : " disabled"}>
+          <span>Skins Game</span>
+        </label>
       `;
       elements.memberList.appendChild(row);
     });
@@ -107,12 +114,14 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
     const checkbox = event.target.closest("[data-member-id]");
     const teeSelect = event.target.closest("[data-tee-for]");
     const pointsCheckbox = event.target.closest("[data-points-for]");
+    const skinsCheckbox = event.target.closest("[data-skins-for]");
 
     if (checkbox?.checked) {
       selectedMemberIds.add(checkbox.dataset.memberId);
     } else if (checkbox) {
       selectedMemberIds.delete(checkbox.dataset.memberId);
       pointsParticipation.delete(checkbox.dataset.memberId);
+      skinsParticipation.delete(checkbox.dataset.memberId);
     }
 
     if (teeSelect) {
@@ -121,6 +130,10 @@ window.OGSGolf.ui.renderSetupView = function renderSetupView(elements, courses, 
 
     if (pointsCheckbox) {
       pointsParticipation.set(pointsCheckbox.dataset.pointsFor, pointsCheckbox.checked);
+    }
+
+    if (skinsCheckbox) {
+      skinsParticipation.set(skinsCheckbox.dataset.skinsFor, skinsCheckbox.checked);
     }
 
     updateSelectedCount();
@@ -135,23 +148,30 @@ window.OGSGolf.ui.readSetupSettings = function readSetupSettings(elements, cours
   const selectedMemberIds = elements.memberList.selectedMemberIds || new Set();
   const teeOverrides = elements.memberList.teeOverrides || new Map();
   const pointsParticipation = elements.memberList.pointsParticipation || new Map();
+  const skinsParticipation = elements.memberList.skinsParticipation || new Map();
   const roundDate = elements.roundDate.value || getTodayInputValue();
   const enteredRoundName = elements.roundName.value.trim();
   const roundName = enteredRoundName || `${course.name} - ${roundDate}`;
+  const pointsAmount = Math.max(1, Math.round(Number(elements.pointsGameAmount?.value || 15)));
+  const skinsAmount = Math.max(1, Math.round(Number(elements.skinsGameAmount?.value || 1)));
   const selectedPlayers = members
     .filter((member) => selectedMemberIds.has(member.id))
     .map((member) => ({
       ...member,
       tee: teeOverrides.get(member.id) || member.tee,
-      inSkins: false,
+      inSkins: skinsParticipation.get(member.id) === true,
       inPoints: pointsParticipation.get(member.id) === true,
       inTeamChallenge: false,
       teamId: ""
     }));
   const hasPointsPlayers = selectedPlayers.some((player) => player.inPoints === true);
+  const hasSkinsPlayers = selectedPlayers.some((player) => player.inSkins === true);
   const games = createDisabledGames();
 
   games.pointsGame.enabled = hasPointsPlayers;
+  games.pointsGame.amount = Number.isFinite(pointsAmount) ? pointsAmount : 0;
+  games.netSkins.enabled = hasSkinsPlayers;
+  games.netSkins.amount = Number.isFinite(skinsAmount) ? skinsAmount : 0;
 
   return {
     id: `round-${Date.now()}`,

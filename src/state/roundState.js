@@ -36,11 +36,11 @@ window.OGSGolf.state.createRoundState = function createRoundState(
   });
 
   function isInSkins(player) {
-    return player.inSkins !== false;
+    return player.inSkins === true;
   }
 
   function isInPoints(player) {
-    return player.inPoints !== false;
+    return player.inPoints === true;
   }
 
   function getSkinsPlayers() {
@@ -475,6 +475,137 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     return summary;
   }
 
+  function getGameAmount(gameId) {
+    const amount = Number(roundSettings.games?.[gameId]?.amount || 0);
+    return Number.isFinite(amount) && amount > 0 ? amount : 0;
+  }
+
+  function roundMoney(value) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return 0;
+    return Math.round(numericValue * 100) / 100;
+  }
+
+  function getPointsPayoutSummary() {
+    const pointsPlayers = getPointsPlayers();
+    const amountPerPlayer = getGameAmount("pointsGame");
+    const enabled = roundSettings.games?.pointsGame?.enabled === true && pointsPlayers.length > 0;
+    const totalPot = enabled ? roundMoney(amountPerPlayer * pointsPlayers.length) : 0;
+    const sectionPot = enabled ? roundMoney(totalPot / 3) : 0;
+
+    function getSection(section) {
+      const result = getPointsLeaders(section);
+      const winners = result.leaders || [];
+      const payoutPerWinner = winners.length > 0 ? roundMoney(sectionPot / winners.length) : 0;
+
+      return {
+        section,
+        pot: sectionPot,
+        points: result.points || 0,
+        target: result.target || 0,
+        differential: result.differential,
+        display: result.display || "-",
+        winners: winners.map((winner) => ({
+          playerId: winner.player.id,
+          playerName: winner.player.name,
+          points: winner.points || 0,
+          target: winner.target || 0,
+          differential: winner.differential,
+          display: winner.display || "-",
+          payout: payoutPerWinner
+        }))
+      };
+    }
+
+    return {
+      enabled,
+      amountPerPlayer,
+      participantCount: pointsPlayers.length,
+      totalPot,
+      sectionPot,
+      front: getSection("front"),
+      back: getSection("back"),
+      overall: getSection("overall")
+    };
+  }
+
+  function getSkinsPayoutSummary() {
+    const skinsPlayers = getSkinsPlayers();
+    const amountPerPlayer = getGameAmount("netSkins");
+    const enabled = roundSettings.games?.netSkins?.enabled === true && skinsPlayers.length > 0;
+    const totalPot = enabled ? roundMoney(amountPerPlayer * skinsPlayers.length) : 0;
+    const skinSummary = getSkinSummary();
+    const winners = Object.values(skinSummary).filter((item) => item.totalSkins > 0);
+    const totalWinningSkins = winners.reduce((total, item) => total + item.totalSkins, 0);
+    const payoutPerSkin = totalWinningSkins > 0 ? roundMoney(totalPot / totalWinningSkins) : 0;
+
+    return {
+      enabled,
+      amountPerPlayer,
+      participantCount: skinsPlayers.length,
+      totalPot,
+      totalWinningSkins,
+      payoutPerSkin,
+      winners: winners.map((item) => ({
+        playerId: item.player.id,
+        playerName: item.player.name,
+        totalSkins: item.totalSkins,
+        holesWon: item.holesWon,
+        payout: roundMoney(item.totalSkins * payoutPerSkin)
+      }))
+    };
+  }
+
+  function getPayoutSummary() {
+    if (savedRound?.completed && !savedRound.payoutSummary) {
+      return null;
+    }
+
+    if (savedRound?.payoutSummary) {
+      return savedRound.payoutSummary;
+    }
+
+    const points = getPointsPayoutSummary();
+    const skins = getSkinsPayoutSummary();
+    const pointWinnings = {};
+    const skinWinnings = {};
+
+    ["front", "back", "overall"].forEach((section) => {
+      points[section].winners.forEach((winner) => {
+        pointWinnings[winner.playerId] = roundMoney((pointWinnings[winner.playerId] || 0) + winner.payout);
+      });
+    });
+
+    skins.winners.forEach((winner) => {
+      skinWinnings[winner.playerId] = roundMoney((skinWinnings[winner.playerId] || 0) + winner.payout);
+    });
+
+    return {
+      points,
+      skins,
+      playerTotals: players
+        .map((player) => {
+          const pointsWinnings = pointWinnings[player.id] || 0;
+          const skinsWinnings = skinWinnings[player.id] || 0;
+
+          return {
+            playerId: player.id,
+            playerName: player.name,
+            pointsWinnings,
+            skinsWinnings,
+            totalWinnings: roundMoney(pointsWinnings + skinsWinnings)
+          };
+        })
+        .sort((firstPlayer, secondPlayer) => {
+          if (secondPlayer.totalWinnings !== firstPlayer.totalWinnings) {
+            return secondPlayer.totalWinnings - firstPlayer.totalWinnings;
+          }
+
+          return firstPlayer.playerName.localeCompare(secondPlayer.playerName);
+        })
+    };
+  }
+
   function isRoundComplete() {
     return players.every((player) =>
       isPlayerDnf(player) || savedScores[player.id].every((score) => score !== null)
@@ -507,6 +638,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
       netWinner: getLowestScoreLeaders("net"),
       points: getPointsSummary(),
       pointsResultStandings: getPointsResultStandings(),
+      payoutSummary: getPayoutSummary(),
       skins: getSkinSummary(),
       playerTotals: players.map((player) => ({
         player,
@@ -726,6 +858,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
         overallPoints: finalSummary.points.overall,
         netSkins: getSkinSummary()
       },
+      payoutSummary: finalSummary.payoutSummary,
       pointsResults: {
         winners: finalSummary.points,
         standings: finalSummary.pointsResultStandings.map((standing) => ({
@@ -1021,6 +1154,7 @@ window.OGSGolf.state.createRoundState = function createRoundState(
     getPointsDifferential,
     getPointsSummary,
     getPointsResultStandings,
+    getPayoutSummary,
     getLeaderboardStandings,
     getStrokesForPlayerOnHole,
     getSkinSummary,

@@ -4,6 +4,11 @@ window.OGSGolf.ui = window.OGSGolf.ui || {};
 window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, roundState) {
   const summary = roundState.getFinalSummary();
 
+  function formatCurrency(value) {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? `$${numericValue.toFixed(2)}` : "$0.00";
+  }
+
   function formatWinner(result, label) {
     if (!result.leaders.length) {
       return `
@@ -22,6 +27,121 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
         <strong>${names}</strong>
         <small>${result.score}</small>
       </div>
+    `;
+  }
+
+  function renderPayoutWinnerRows(winners = []) {
+    if (!winners.length) {
+      return `
+        <div class="summary-row">
+          <span>No winner</span>
+          <strong>${formatCurrency(0)}</strong>
+          <small>No payout assigned</small>
+        </div>
+      `;
+    }
+
+    return winners.map((winner) => `
+      <div class="summary-row">
+        <span>${winner.playerName}</span>
+        <strong>${formatCurrency(winner.payout)}</strong>
+        <small>${winner.points} points / ${winner.target} needed</small>
+        <small>${winner.display}</small>
+      </div>
+    `).join("");
+  }
+
+  function renderPayoutSection() {
+    const payoutSummary = summary.payoutSummary;
+
+    if (!payoutSummary) {
+      return "";
+    }
+
+    const hasPointsPayout = payoutSummary.points?.enabled === true;
+    const hasSkinsPayout = payoutSummary.skins?.enabled === true;
+
+    if (!hasPointsPayout && !hasSkinsPayout) {
+      return `
+        <section class="summary-block payout-summary-block">
+          <h3>Points & Skins Payouts</h3>
+          <div class="summary-row">
+            <span>No payout data saved.</span>
+            <strong>${formatCurrency(0)}</strong>
+            <small>Points and skins were turned off or had no participating players.</small>
+          </div>
+        </section>
+      `;
+    }
+
+    const skinsRows = !hasSkinsPayout
+      ? `
+        <div class="summary-row">
+          <span>Skins game off</span>
+          <strong>${formatCurrency(0)}</strong>
+          <small>No skins payout</small>
+        </div>
+      `
+      : payoutSummary.skins.winners.length
+        ? payoutSummary.skins.winners.map((winner) => {
+          const holeText = winner.holesWon.length
+            ? `Holes ${winner.holesWon.join(", ")}`
+            : `${winner.totalSkins} skin${winner.totalSkins === 1 ? "" : "s"}`;
+
+          return `
+            <div class="summary-row">
+              <span>${winner.playerName}</span>
+              <strong>${formatCurrency(winner.payout)}</strong>
+              <small>${holeText}</small>
+            </div>
+          `;
+        }).join("")
+        : `
+          <div class="summary-row">
+            <span>No skins won</span>
+            <strong>${formatCurrency(0)}</strong>
+            <small>No skins payout assigned</small>
+          </div>
+        `;
+    const playerPayoutRows = (payoutSummary.playerTotals || [])
+      .map((playerTotal) => `
+        <div class="summary-row">
+          <span>${playerTotal.playerName}</span>
+          <strong>${formatCurrency(playerTotal.totalWinnings)}</strong>
+          <small>Points ${formatCurrency(playerTotal.pointsWinnings)} | Skins ${formatCurrency(playerTotal.skinsWinnings)}</small>
+        </div>
+      `)
+      .join("");
+
+    return `
+      <section class="summary-block payout-summary-block">
+        <h3>Points & Skins Payouts</h3>
+        <section class="points-category">
+          <h4>Points</h4>
+          ${hasPointsPayout ? `
+            <div class="payout-subtitle">Front Nine</div>
+            <div class="summary-list">${renderPayoutWinnerRows(payoutSummary.points.front?.winners)}</div>
+            <div class="payout-subtitle">Back Nine</div>
+            <div class="summary-list">${renderPayoutWinnerRows(payoutSummary.points.back?.winners)}</div>
+            <div class="payout-subtitle">Overall</div>
+            <div class="summary-list">${renderPayoutWinnerRows(payoutSummary.points.overall?.winners)}</div>
+          ` : `
+            <div class="summary-row">
+              <span>Points game off</span>
+              <strong>${formatCurrency(0)}</strong>
+              <small>No points payout</small>
+            </div>
+          `}
+        </section>
+        <section class="points-category">
+          <h4>Skins</h4>
+          <div class="summary-list">${skinsRows}</div>
+        </section>
+        <section class="points-category">
+          <h4>Player Payout Summary</h4>
+          <div class="summary-list">${playerPayoutRows}</div>
+        </section>
+      </section>
     `;
   }
 
@@ -151,6 +271,8 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
     .join("");
 
   elements.finalSummary.innerHTML = `
+    ${renderPayoutSection()}
+
     ${pointsResultsSection}
 
     <section class="summary-block">

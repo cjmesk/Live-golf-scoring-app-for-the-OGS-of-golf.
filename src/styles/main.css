@@ -477,6 +477,11 @@ body.is-scoring .current-hole-status {
   gap: 10px;
 }
 
+.game-value-grid {
+  display: grid;
+  gap: 10px;
+}
+
 .setup-tools {
   display: grid;
   gap: 8px;
@@ -1118,6 +1123,18 @@ body.is-scoring .current-hole-status {
   margin: 0;
   color: var(--green-dark);
   font-size: 1rem;
+}
+
+.payout-summary-block {
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.payout-subtitle {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .points-full-category {

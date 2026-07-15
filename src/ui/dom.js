@@ -74,6 +74,8 @@ window.OGSGolf.ui.getElements = function getElements() {
     memberSearch: document.querySelector("#memberSearch"),
     selectedPlayerCount: document.querySelector("#selectedPlayerCount"),
     memberList: document.querySelector("#memberList"),
+    pointsGameAmount: document.querySelector("#pointsGameAmount"),
+    skinsGameAmount: document.querySelector("#skinsGameAmount"),
     gameList: document.querySelector("#gameList"),
     teamAssignmentPanel: document.querySelector("#teamAssignmentPanel"),
     teamAssignmentList: document.querySelector("#teamAssignmentList"),
