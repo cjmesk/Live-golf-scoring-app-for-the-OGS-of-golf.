@@ -109,15 +109,15 @@ window.OGSGolf.ui.renderLeaderboard = function renderLeaderboard(elements, playe
     row.innerHTML = `
       <div class="rank">${standing.rankLabel}</div>
       <div>
-        <div class="player-name">${player.name}</div>
-        <div class="player-details">Chicago Quota ${overallPointsResult.target} overall (${frontPointsResult.target} front / ${backPointsResult.target} back)</div>
+        <div class="player-name">${player.name} ${overallPointsResult.display}</div>
+        <div class="player-details">Front: ${totals.frontPoints} pts (Target: ${frontPointsResult.target}) ${frontPointsResult.display}</div>
+        <div class="player-details">Back: ${totals.backPoints} pts (Target: ${backPointsResult.target}) ${backPointsResult.display}</div>
+        <div class="player-details">Total: ${totals.points} pts (Target: ${overallPointsResult.target}) ${overallPointsResult.display}</div>
         <div class="player-details">${totals.holesPlayed}/${totalHoles} holes saved</div>
       </div>
       <div class="leaderboard-totals">
         <span class="points">${overallPointsResult.display}</span>
-        <span class="gross">${totals.points} points</span>
-        <span class="gross">Front ${frontPointsResult.display}</span>
-        <span class="gross">Back ${backPointsResult.display}</span>
+        <span class="gross">${totals.points} pts</span>
       </div>
     `;
     section.appendChild(row);

@@ -374,6 +374,11 @@ if (!pointsSection.innerHTML.includes("<div class=\"rank\">T1</div>")) {
   throw new Error("Chicago points leaderboard must display tied players with tied rank labels.");
 }
 
+if (!pointsSection.innerHTML.includes("Front: 4 pts (Target: 18)")
+  || !pointsSection.innerHTML.includes("Total: 4 pts (Target: 36)")) {
+  throw new Error("Live Points leaderboard must show points earned, target, and result in the uniform format.");
+}
+
 console.log("Split gross and Chicago leaderboard test passed.");
 
 const finalSummaryRoundState = window.OGSGolf.state.createRoundState(course, splitLeaderboardPlayers, {
@@ -431,6 +436,12 @@ if (!finalSummaryElement.innerHTML.includes("Front-nine Points Winner")
 
 if (!finalSummaryElement.innerHTML.includes("1. Points Player")) {
   throw new Error("Points Results must rank the best quota result first.");
+}
+
+if (!finalSummaryElement.innerHTML.includes("Front: 36 pts (Target: 18)")
+  || !finalSummaryElement.innerHTML.includes("Back: 36 pts (Target: 18)")
+  || !finalSummaryElement.innerHTML.includes("Total: 72 pts (Target: 36)")) {
+  throw new Error("Points Results must show points earned over quota for front, back, and total.");
 }
 
 const exportedRound = finalSummaryRoundState.getRoundExport();

@@ -26,6 +26,7 @@
     <button type="button" data-menu-action="editSetup" class="admin-only">Edit Round Setup</button>
     <button type="button" data-menu-action="scoring">Live Scoring</button>
     <button type="button" data-menu-action="leaderboard">Leaderboard</button>
+    <button id="menuLastRoundResults" type="button" data-menu-action="lastResults" class="is-hidden">Last Round Results</button>
     <button type="button" data-menu-action="courseInfo">Course Information</button>
     <button type="button" data-menu-action="handicapVerify" class="admin-only">Course Handicap Verification</button>
     <button type="button" data-menu-action="players" class="admin-only">Player Management</button>
@@ -84,6 +85,7 @@
       <div class="today-actions">
         <button id="viewLiveMatch" type="button" class="save-button start-button">View Live Match</button>
         <button id="choosePlayerScoring" type="button" class="secondary-button">I'm Playing / Scoring</button>
+        <button id="todayLastRoundResults" type="button" class="secondary-button is-hidden">Last Round Results</button>
         <button id="todayCommissionerMode" type="button" class="secondary-button">Commissioner Mode</button>
       </div>
       <div id="todayStatus" class="cloud-save-status"></div>
@@ -531,18 +533,18 @@
   <script src="src/cloud/supabaseConfig.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/supabaseClient.js?v=20260709-v098-menu"></script>
   <script src="src/cloud/roundCloudService.js?v=20260712-final-round-sync"></script>
-  <script src="src/ui/dom.js?v=20260714-commissioner-navigation"></script>
+  <script src="src/ui/dom.js?v=20260715-last-round-results"></script>
   <script src="src/ui/formatters.js?v=20260710-index-course-handicap"></script>
   <script src="src/ui/setupView.js?v=20260714-points-participation"></script>
   <script src="src/ui/holeView.js?v=20260712-direct-score-gross-fix"></script>
-  <script src="src/ui/leaderboardView.js?v=20260714-points-leaderboard-first"></script>
+  <script src="src/ui/leaderboardView.js?v=20260715-uniform-points-format"></script>
   <script src="src/ui/pointsPayoutView.js?v=20260710-points-quota"></script>
   <script src="src/ui/skinsView.js?v=20260709-v098-menu"></script>
-  <script src="src/ui/finalSummaryView.js?v=20260714-final-points-results"></script>
+  <script src="src/ui/finalSummaryView.js?v=20260715-uniform-points-format"></script>
   <script src="src/ui/previousRoundsView.js?v=20260711-dnf"></script>
   <script src="src/ui/playerManagementView.js?v=20260711-cloud-roster-save"></script>
   <script src="src/ui/groupSetupView.js?v=20260710-flex-hole-order"></script>
   <script src="src/ui/eventSummaryView.js?v=20260710-round-setup"></script>
-  <script src="src/app.js?v=20260714-commissioner-navigation"></script>
+  <script src="src/app.js?v=20260715-last-round-results"></script>
 </body>
 </html>

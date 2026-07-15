@@ -44,6 +44,8 @@ let pendingDnfPlayerId = null;
 let scoreOverrideOpen = false;
 let scoreOverrideActive = false;
 let scoreOverrideReturnGroupIndex = 0;
+let summaryDisplayRoundState = null;
+let summaryReadOnlyMode = false;
 let finalRoundSyncInFlight = false;
 let latestCloudActiveRoundInfo = {
   id: "",
@@ -163,6 +165,7 @@ function renderTodayRoundScreen() {
   elements.todayStatus.textContent = hasActiveRound
     ? "Today's match is ready."
     : "No active round yet.";
+  updateLastRoundResultsVisibility();
 }
 
 function showTodayRoundScreen() {
@@ -171,9 +174,52 @@ function showTodayRoundScreen() {
   scrollToTop();
 }
 
+function getLastCompletedRound() {
+  return roundStorage.getAll()
+    .filter((round) => round?.completed === true)
+    .sort((firstRound, secondRound) => {
+      const firstDate = new Date(firstRound.savedAt || firstRound.date || 0).getTime();
+      const secondDate = new Date(secondRound.savedAt || secondRound.date || 0).getTime();
+      return secondDate - firstDate;
+    })[0] || null;
+}
+
+function updateLastRoundResultsVisibility() {
+  const hasLastRound = Boolean(getLastCompletedRound());
+  elements.menuLastRoundResults?.classList.toggle("is-hidden", !hasLastRound);
+  elements.todayLastRoundResults?.classList.toggle("is-hidden", !hasLastRound);
+}
+
+function createReadOnlyRoundStateFromSavedRound(savedRound) {
+  if (!savedRound?.course?.id || !savedRound?.players?.length) return null;
+  if (!savedRound.savedScores) return null;
+
+  const savedCourse = courses.find((course) => course.id === savedRound.course.id) || courses[0];
+  const savedPlayers = savedRound.players.map((player) => ({
+    ...player,
+    handicap: player.handicapIndex ?? player.handicap
+  }));
+  const savedSettings = {
+    ...(savedRound.roundSettings || {}),
+    games: {
+      pointsGame: { enabled: false },
+      netSkins: { enabled: false },
+      teamChallenge: { enabled: false },
+      ...(savedRound.roundSettings?.games || {})
+    },
+    groups: savedRound.roundSettings?.groups || [savedPlayers.map((player) => player.id)],
+    groupRecords: savedRound.roundSettings?.groupRecords || [{ holesToPlay: savedCourse.tees.white.length }],
+    course: savedCourse,
+    players: savedPlayers
+  };
+
+  return createRoundState(savedCourse, savedPlayers, savedSettings, savedRound);
+}
+
 function renderAccessMode() {
   if (!elements.modeStatus) return;
 
+  updateLastRoundResultsVisibility();
   elements.adminOnlyItems.forEach((item) => {
     item.classList.toggle("is-hidden", !commissionerMode);
   });
@@ -528,6 +574,11 @@ async function handleMenuAction(action) {
 
   if (action === "leaderboard") {
     showLeaderboard();
+    return;
+  }
+
+  if (action === "lastResults") {
+    showLastRoundResults();
     return;
   }
 
@@ -1869,19 +1920,59 @@ function saveCompletedRound() {
   roundStorage.save(completedRound);
   roundStorage.clearUnfinished();
   completedRoundSaved = true;
+  updateLastRoundResultsVisibility();
   return completedRound;
 }
 
-function showFinalSummary() {
+function setSummaryButtonsForReadOnly(isReadOnly) {
+  elements.saveRound.classList.toggle("is-hidden", isReadOnly);
+  elements.saveRoundCloud.classList.toggle("is-hidden", isReadOnly);
+  elements.summaryUndoLastHole.classList.toggle("is-hidden", isReadOnly);
+  elements.startNewRound.classList.toggle("is-hidden", isReadOnly || !commissionerMode);
+  elements.viewFinalLeaderboard.classList.toggle("is-hidden", isReadOnly);
+  elements.summaryPreviousRounds.classList.toggle("is-hidden", isReadOnly);
+}
+
+function showFinalSummary(summaryState = roundState, { readOnly = false, statusMessage = "" } = {}) {
+  if (!summaryState) return;
+
+  summaryDisplayRoundState = summaryState;
+  summaryReadOnlyMode = readOnly;
   if (elements.summaryTitle) {
-    elements.summaryTitle.textContent = "Round Complete";
+    elements.summaryTitle.textContent = readOnly ? "Last Round Results" : "Round Complete";
   }
   setActiveScreen("summary");
-  renderFinalSummary(elements, roundState);
-  elements.cloudSaveStatus.textContent = completedRoundSaved
+  renderFinalSummary(elements, summaryState);
+  setSummaryButtonsForReadOnly(readOnly);
+  elements.cloudSaveStatus.textContent = statusMessage || (readOnly
+    ? "Showing the most recently completed round saved on this device."
+    : completedRoundSaved
     ? "Final scores recorded."
-    : "Round complete. Review scores, then tap Confirm Final Scores.";
+    : "Round complete. Review scores, then tap Confirm Final Scores.");
   scrollToTop();
+}
+
+function showLastRoundResults() {
+  const lastRound = getLastCompletedRound();
+
+  if (!lastRound) {
+    showTodayRoundScreen();
+    elements.todayStatus.textContent = "No completed round found yet.";
+    return;
+  }
+
+  const lastRoundState = createReadOnlyRoundStateFromSavedRound(lastRound);
+
+  if (!lastRoundState) {
+    showTodayRoundScreen();
+    elements.todayStatus.textContent = "Last completed round is missing data needed to recreate the results screen.";
+    return;
+  }
+
+  showFinalSummary(lastRoundState, {
+    readOnly: true,
+    statusMessage: "Read-only results from the most recently completed round."
+  });
 }
 
 function transitionToCompletedRound(completedRound, source = "cloud completed round") {
@@ -1889,6 +1980,7 @@ function transitionToCompletedRound(completedRound, source = "cloud completed ro
 
   roundStorage.clearUnfinished();
   roundStorage.save(completedRound);
+  updateLastRoundResultsVisibility();
   loadSavedRoundIntoState(completedRound);
   completedRoundSaved = true;
   showFinalSummary();
@@ -1944,8 +2036,12 @@ async function completeFullRoundIfReady(context = "completion-check") {
 }
 
 function reviewScorecard() {
+  const scorecardState = summaryDisplayRoundState || roundState;
+  if (!scorecardState) return;
+
   setActiveScreen("summary");
-  renderCompletedScorecard(elements, roundState);
+  renderCompletedScorecard(elements, scorecardState);
+  setSummaryButtonsForReadOnly(summaryReadOnlyMode);
   elements.cloudSaveStatus.textContent = "Showing compact scorecard.";
   scrollToTop();
 }
@@ -2008,7 +2104,7 @@ function discardSavedRound() {
 function saveRound() {
   saveCompletedRound();
   elements.cloudSaveStatus.textContent = "Final scores recorded on this device.";
-  renderFinalSummary(elements, roundState);
+  showFinalSummary();
 }
 
 async function saveRoundToCloud() {
@@ -2714,6 +2810,7 @@ elements.startFreshRound.addEventListener("click", () => startFreshRound({ clear
 elements.discardSavedRound.addEventListener("click", discardSavedRound);
 elements.viewLiveMatch.addEventListener("click", viewLiveMatch);
 elements.choosePlayerScoring.addEventListener("click", choosePlayerOrScorer);
+elements.todayLastRoundResults.addEventListener("click", showLastRoundResults);
 elements.todayCommissionerMode.addEventListener("click", openCommissionerFromToday);
 elements.scorerList.addEventListener("click", (event) => {
   const leaderboardOnlyButton = event.target.closest("[data-view-leaderboard-only]");

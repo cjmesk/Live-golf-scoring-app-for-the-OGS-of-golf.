@@ -26,6 +26,12 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
   }
 
   function formatPointsWinner(result, label) {
+    const sectionLabel = label.startsWith("Front")
+      ? "Front"
+      : label.startsWith("Back")
+        ? "Back"
+        : "Overall";
+
     if (!result.leaders.length) {
       return `
         <div class="summary-card">
@@ -41,7 +47,7 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
       <div class="summary-card">
         <span>${label}</span>
         <strong>${names}</strong>
-        <small>${result.display} (${result.points} pts / ${result.target})</small>
+        <small>${sectionLabel}: ${result.points} pts (Target: ${result.target}) ${result.display}</small>
       </div>
     `;
   }
@@ -63,11 +69,10 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
   const pointsRows = summary.pointsResultStandings
     .map((item) => `
       <div class="summary-row points-result-row">
-        <span>${item.rankLabel}. ${item.player.name}</span>
-        <strong>${item.overall.display} Overall</strong>
-        <small>Front: ${item.totals.frontPoints} points, ${item.front.display}</small>
-        <small>Back: ${item.totals.backPoints} points, ${item.back.display}</small>
-        <small>Total: ${item.totals.points} points</small>
+        <strong>${item.rankLabel}. ${item.player.name} ${item.overall.display}</strong>
+        <small>Front: ${item.totals.frontPoints} pts (Target: ${item.front.target}) ${item.front.display}</small>
+        <small>Back: ${item.totals.backPoints} pts (Target: ${item.back.target}) ${item.back.display}</small>
+        <small>Total: ${item.totals.points} pts (Target: ${item.overall.target}) ${item.overall.display}</small>
       </div>
     `)
     .join("");
