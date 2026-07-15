@@ -428,20 +428,30 @@ if (finalSummaryElement.innerHTML.includes("Gross Only</span>\n        <strong>"
   throw new Error("Points Results must not include players who are not in the points game.");
 }
 
-if (!finalSummaryElement.innerHTML.includes("Front-nine Points Winner")
-  || !finalSummaryElement.innerHTML.includes("Back-nine Points Winner")
-  || !finalSummaryElement.innerHTML.includes("Overall Points Winner")) {
-  throw new Error("Round Complete page must show front, back, and overall points winner labels.");
+if (!finalSummaryElement.innerHTML.includes("Overall Points")
+  || !finalSummaryElement.innerHTML.includes("Front Nine Points")
+  || !finalSummaryElement.innerHTML.includes("Back Nine Points")) {
+  throw new Error("Round Complete page must show overall, front, and back points sections.");
 }
 
-if (!finalSummaryElement.innerHTML.includes("1. Points Player")) {
+if (finalSummaryElement.innerHTML.indexOf("Overall Points") > finalSummaryElement.innerHTML.indexOf("Gross Results")
+  || finalSummaryElement.innerHTML.indexOf("Front Nine Points") > finalSummaryElement.innerHTML.indexOf("Gross Results")
+  || finalSummaryElement.innerHTML.indexOf("Back Nine Points") > finalSummaryElement.innerHTML.indexOf("Gross Results")) {
+  throw new Error("All Points sections must appear above Gross Results.");
+}
+
+if (finalSummaryElement.innerHTML.indexOf("Full Points Standings") < finalSummaryElement.innerHTML.indexOf("Back Nine Points")) {
+  throw new Error("Full points standings must appear below the top-three points sections.");
+}
+
+if (!finalSummaryElement.innerHTML.includes("1. Points Player")
+  || !finalSummaryElement.innerHTML.includes("2. Tie Player")) {
   throw new Error("Points Results must rank the best quota result first.");
 }
 
-if (!finalSummaryElement.innerHTML.includes("Front: 36 pts (Target: 18)")
-  || !finalSummaryElement.innerHTML.includes("Back: 36 pts (Target: 18)")
-  || !finalSummaryElement.innerHTML.includes("Total: 72 pts (Target: 36)")) {
-  throw new Error("Points Results must show points earned over quota for front, back, and total.");
+if (!finalSummaryElement.innerHTML.includes("72 points / 36 needed")
+  || !finalSummaryElement.innerHTML.includes("36 points / 18 needed")) {
+  throw new Error("Points Results must show points earned and points needed to break even.");
 }
 
 const exportedRound = finalSummaryRoundState.getRoundExport();

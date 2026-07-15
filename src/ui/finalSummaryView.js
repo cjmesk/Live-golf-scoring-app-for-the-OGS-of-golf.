@@ -25,33 +25,6 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
     `;
   }
 
-  function formatPointsWinner(result, label) {
-    const sectionLabel = label.startsWith("Front")
-      ? "Front"
-      : label.startsWith("Back")
-        ? "Back"
-        : "Overall";
-
-    if (!result.leaders.length) {
-      return `
-        <div class="summary-card">
-          <span>${label}</span>
-          <strong>No players</strong>
-          <small>Points Game</small>
-        </div>
-      `;
-    }
-
-    const names = result.leaders.map((item) => item.player.name).join(", ");
-    return `
-      <div class="summary-card">
-        <span>${label}</span>
-        <strong>${names}</strong>
-        <small>${sectionLabel}: ${result.points} pts (Target: ${result.target}) ${result.display}</small>
-      </div>
-    `;
-  }
-
   const skinsRows = summary.playerTotals
     .map((item) => {
       const holes = item.skins.holesWon.length ? item.skins.holesWon.join(", ") : "-";
@@ -66,26 +39,95 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
     })
     .join("");
 
-  const pointsRows = summary.pointsResultStandings
-    .map((item) => `
+  function getPointsStandingsForSection(section) {
+    let currentRank = 1;
+    const standings = [...summary.pointsResultStandings]
+      .sort((firstItem, secondItem) => {
+        if (secondItem[section].differential !== firstItem[section].differential) {
+          return secondItem[section].differential - firstItem[section].differential;
+        }
+
+        if (secondItem[section].points !== firstItem[section].points) {
+          return secondItem[section].points - firstItem[section].points;
+        }
+
+        return firstItem.player.name.localeCompare(secondItem.player.name);
+      });
+
+    return standings.map((item, index) => {
+      const previousItem = standings[index - 1];
+      const nextItem = standings[index + 1];
+      const tiedWithPrevious = previousItem
+        && previousItem[section].differential === item[section].differential
+        && previousItem[section].points === item[section].points;
+      const tiedWithNext = nextItem
+        && nextItem[section].differential === item[section].differential
+        && nextItem[section].points === item[section].points;
+
+      if (!tiedWithPrevious) {
+        currentRank = index + 1;
+      }
+
+      return {
+        ...item,
+        sectionRank: currentRank,
+        sectionRankLabel: tiedWithPrevious || tiedWithNext ? `T-${currentRank}` : String(currentRank)
+      };
+    });
+  }
+
+  function renderPointsStandingRow(item, section, isHighlight = false) {
+    const result = item[section];
+    const pointLabel = result.points === 1 ? "point" : "points";
+
+    return `
       <div class="summary-row points-result-row">
-        <strong>${item.rankLabel}. ${item.player.name} ${item.overall.display}</strong>
-        <small>Front: ${item.totals.frontPoints} pts (Target: ${item.front.target}) ${item.front.display}</small>
-        <small>Back: ${item.totals.backPoints} pts (Target: ${item.back.target}) ${item.back.display}</small>
-        <small>Total: ${item.totals.points} pts (Target: ${item.overall.target}) ${item.overall.display}</small>
+        <span>${item.sectionRankLabel}. ${item.player.name}</span>
+        <strong>${isHighlight ? result.display : ""}</strong>
+        <small>${result.points} ${pointLabel} / ${result.target} needed</small>
+        <small>${result.display}</small>
       </div>
-    `)
-    .join("");
+    `;
+  }
+
+  function renderPointsTopThreeCategory(title, section) {
+    const standings = getPointsStandingsForSection(section);
+    const topThree = standings.filter((item) => item.sectionRank <= 3);
+    const topRows = topThree.map((item) => renderPointsStandingRow(item, section, true)).join("");
+
+    return `
+      <section class="points-category">
+        <h4>${title}</h4>
+        <div class="summary-list">${topRows}</div>
+      </section>
+    `;
+  }
+
+  function renderPointsFullStandings(title, section) {
+    const standings = getPointsStandingsForSection(section);
+    const fullRows = standings.map((item) => renderPointsStandingRow(item, section)).join("");
+
+    return `
+      <details class="points-full-standings" open>
+        <summary>${title}</summary>
+        <div class="summary-list">${fullRows}</div>
+      </details>
+    `;
+  }
+
   const pointsResultsSection = summary.pointsResultStandings.length
     ? `
       <section class="summary-block">
         <h3>Points Results</h3>
-        <div class="summary-grid">
-          ${formatPointsWinner(summary.points.front, "Front-nine Points Winner")}
-          ${formatPointsWinner(summary.points.back, "Back-nine Points Winner")}
-          ${formatPointsWinner(summary.points.overall, "Overall Points Winner")}
-        </div>
-        <div class="summary-list">${pointsRows}</div>
+        ${renderPointsTopThreeCategory("Overall Points", "overall")}
+        ${renderPointsTopThreeCategory("Front Nine Points", "front")}
+        ${renderPointsTopThreeCategory("Back Nine Points", "back")}
+        <section class="points-category points-full-category">
+          <h4>Full Points Standings</h4>
+          ${renderPointsFullStandings("Overall Points", "overall")}
+          ${renderPointsFullStandings("Front Nine Points", "front")}
+          ${renderPointsFullStandings("Back Nine Points", "back")}
+        </section>
       </section>
     `
     : "";
@@ -109,16 +151,21 @@ window.OGSGolf.ui.renderFinalSummary = function renderFinalSummary(elements, rou
     .join("");
 
   elements.finalSummary.innerHTML = `
-    <div class="summary-grid">
-      ${formatWinner(summary.grossWinner, "Gross Winner")}
-      ${formatWinner(summary.netWinner, "Net Winner")}
-    </div>
-
     ${pointsResultsSection}
 
     <section class="summary-block">
       <h3>Gross Results</h3>
+      <div class="summary-grid">
+        ${formatWinner(summary.grossWinner, "Gross Winner")}
+      </div>
       <div class="summary-list">${totalRows}</div>
+    </section>
+
+    <section class="summary-block">
+      <h3>Net Results</h3>
+      <div class="summary-grid">
+        ${formatWinner(summary.netWinner, "Net Winner")}
+      </div>
     </section>
 
     <section class="summary-block">

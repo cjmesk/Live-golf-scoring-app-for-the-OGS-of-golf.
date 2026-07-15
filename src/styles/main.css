@@ -1108,6 +1108,34 @@ body.is-scoring .current-hole-status {
   font-size: 1.18rem;
 }
 
+.points-category {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.points-category h4 {
+  margin: 0;
+  color: var(--green-dark);
+  font-size: 1rem;
+}
+
+.points-full-category {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.points-full-standings {
+  display: grid;
+  gap: 8px;
+}
+
+.points-full-standings summary {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
 .summary-actions {
   margin-top: 12px;
 }
